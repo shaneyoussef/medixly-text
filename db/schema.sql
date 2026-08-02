@@ -123,7 +123,7 @@ begin
          staff_notes = null
    where status in ('completed','cancelled')
      and completed_at < now() - retain
-     and payload ? 'purged' = false;
+     and not (payload ? 'purged');
   get diagnostics n = row_count;
   insert into audit_log (actor, action, detail)
        values ('system', 'purged', jsonb_build_object('rows', n, 'retain', retain::text));
