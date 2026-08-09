@@ -1,0 +1,19 @@
+# Patient site — the secure chat client.
+#
+# Netlify reads this file from the repo root and it overrides the publish
+# directory set in the site UI, so the deployed directory is decided here in
+# version control rather than in a dashboard someone can change by accident.
+#
+# Never point this at `web/` or at `web/queue`. `web/` serves the staff
+# dashboard at /queue/, and `web/queue` serves it at the root — either one
+# puts patient submissions on the public site. `web/form` is the only
+# patient-facing directory.
+#
+# The staff queue is a second, separate Netlify site. Set that site's base
+# directory to `web/queue` so it reads web/queue/netlify.toml instead of this
+# file, and set its visitor access to private.
+
+[build]
+  publish = "web/form"
+
+# No build step. The pages are static and load their assets by relative path.
