@@ -32,7 +32,7 @@ and call 911."* No further data collection.
 
 ### 1. Greeting and consent
 
-> Thanks for calling Medixly Pharmacy. I can help you move your prescriptions
+> Thanks for calling Medixly. I can help you move your prescriptions
 > over from another pharmacy — it takes about a minute and you won't need to call
 > them yourself. This call is recorded to process your request. Would you like to
 > get started?

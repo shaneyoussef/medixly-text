@@ -74,7 +74,7 @@ const demoTransport = {
 };
 
 const chat = new SecureChat(document.getElementById('chat'), {
-  pharmacyName: 'Old Park Pharmacy',
+  pharmacyName: 'Medixly',
   presence: 'Pharmacist on duty · replies within 2 hours',
   country: 'Canada',
   history: seed,
@@ -128,7 +128,7 @@ const demoAuth = {
 new AuthGate(document.getElementById('chat'), {
   auth: demoAuth,
   chat,
-  pharmacyName: 'Old Park Pharmacy',
+  pharmacyName: 'Medixly',
   country: 'Canada',
   onSession: profile => console.log('[auth] session', profile)
 });

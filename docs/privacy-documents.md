@@ -37,7 +37,7 @@ The contact person is responsible for:
 
 **Published contact**
 
-    Privacy Officer, Medixly Pharmacy
+    Privacy Officer, Medixly
     [MAILING ADDRESS]
     [PHONE]
     [EMAIL]
@@ -192,9 +192,9 @@ who never completed the transfer is not a patient record.
 
 ---
 
-## How Medixly Pharmacy handles your information
+## How Medixly handles your information
 
-Medixly Pharmacy is a health information custodian under Ontario's *Personal
+Medixly is a health information custodian under Ontario's *Personal
 Health Information Protection Act, 2004*. This notice explains what we collect
 when you use our online services, why, and what rights you have.
 
@@ -250,7 +250,7 @@ information.
 
 To exercise any of these, contact:
 
-    Privacy Officer, Medixly Pharmacy
+    Privacy Officer, Medixly
     [ADDRESS] · [PHONE] · [EMAIL]
 
 If you are not satisfied with our response, you may contact the Information and

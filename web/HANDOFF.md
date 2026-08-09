@@ -1,6 +1,6 @@
 # Secure chat — handoff
 
-Patient secure messaging for **Old Park Pharmacy**, built on the Medixly design
+Patient secure messaging for **Medixly**, built on the Medixly design
 system. This document is the source of truth for what exists, what's deliberately
 missing, and what to build next.
 
@@ -224,7 +224,7 @@ the design system mandates sentence case, so they render as "Store pickup" /
 The consent block names **PIPEDA**. Ontario pharmacies are health information
 custodians under **PHIPA**, and Ontario record retention is a minimum of 10
 years from the last professional service, or until 10 years after the patient
-would have reached 18, whichever is longer. If Old Park is in Ontario, the
+would have reached 18, whichever is longer. If Medixly is in Ontario, the
 verbatim consent string may name the wrong statute — and it appears on every
 form. Confirm with the pharmacy's privacy officer before launch.
 
