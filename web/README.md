@@ -11,6 +11,14 @@ advertised; `queue/` must never be.
 | `form/` | Patients | `web/form` | Public |
 | `queue/` | Pharmacy staff | `web/queue` | Private — Netlify visitor access set to private, plus the staff key |
 
+`form/` holds the secure chat client, served at that site's root from
+`index.html`. It is **not submittable yet** — `secure-chat.forms.js` and
+`secure-chat.print.js` are placeholders, so there is no service rail, no form
+card and no consent block. See [`HANDOFF.md`](HANDOFF.md).
+
+Never set a publish directory to `web/` itself. That would serve `queue/` from
+the public site.
+
 Both call the Supabase edge functions in `ca-central-1`. No patient data is
 stored by Netlify; it serves HTML only.
 

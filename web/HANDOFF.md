@@ -8,22 +8,25 @@ missing, and what to build next.
 
 ## What exists
 
-All files live in `web/`. They were previously one 106KB `secure-chat.html`;
-the split version replaces it in place.
+All files live in `web/form/`, which is the patient site's Netlify publish
+directory — so the chat is served at that site's root. They were previously one
+106KB `secure-chat.html`; the split version replaces it in place.
 
-**Two files have not landed yet.** Until `secure-chat.forms.js` does, the page
-does not run: `mount()` calls `renderServices()`, which reads `SERVICES`.
+**Two files have not landed yet**, and both are currently stood up by a
+placeholder so the page loads on a deploy preview. With the placeholder in
+place there is no service rail, no form card and no consent block: **the page
+cannot submit anything.** Replace both files wholesale; don't merge into them.
 
 | File | What's in it | Landed |
 | --- | --- | --- |
-| `secure-chat.html` | Shell. Markup only, loads everything below. | yes |
+| `index.html` | Shell. Markup only, loads everything below. | yes |
 | `ds-tokens.css` | Copy of the Medixly design tokens so the page opens standalone. In the app, drop it and link the real design system. | yes |
 | `secure-chat.css` | All chat styling. | yes |
 | `secure-chat.auth.css` | Sign-in gate styling. | yes |
 | `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
-| `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | **no** |
+| `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | **placeholder** |
 | `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
-| `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **no** |
+| `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
 | `secure-chat.demo.js` | Stub transport and boot. Replace to go live. | yes |
 
 ### Features built
@@ -181,10 +184,10 @@ system answers the substantive part of any patient request.
 10. **Barcode of the submission ID** on the print sheet (Code 128), so sheets
     scan into the pharmacy system without typing.
 
-11. **Netlify publish directories.** `web/README.md` documents `web/form/` as a
-    publish directory that doesn't exist, and `secure-chat.html` sits outside
-    both publish directories — so it isn't deployed. Fix in its own PR, separate
-    from this work.
+11. ~~**Netlify publish directories.**~~ Done. `web/form/` now exists and holds
+    the whole chat client, with the shell renamed `index.html` so it serves at
+    the site root. Publishing `web/` itself was never an option — it would have
+    put the staff queue on the public site.
 
 ---
 
