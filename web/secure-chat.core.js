@@ -236,8 +236,6 @@ class SecureChat {
     this.render();
   }
 
-  /* ── Sending ─────────────────────────────────────────────────── */
-
   /* ── Sheet and viewer ────────────────────────────────────────── */
 
   openSheet() {
@@ -430,6 +428,8 @@ class SecureChat {
       return bar;
     }));
   }
+
+  /* ── Sending ─────────────────────────────────────────────────── */
 
   async send() {
     const input = this.$('input');
