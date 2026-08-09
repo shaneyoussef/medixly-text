@@ -1,8 +1,17 @@
 # Compliance — PHIPA (Ontario) & PIPEDA
 
-**Roles:** The pharmacy is the *health information custodian* under PHIPA.
-Medixly is an *agent / electronic service provider* acting on the custodian's
-instructions. This distinction drives everything below.
+**Roles:** Medixly is the *health information custodian* under PHIPA — one
+pharmacy running its own software. There is no second party: no agent
+relationship, no electronic service provider standing between a pharmacy and its
+records, and no data processing agreement with a client pharmacy, because there
+is no client pharmacy. Medixly answers to its patients and to the Information and
+Privacy Commissioner of Ontario directly.
+
+That removes a party; it does not remove obligations. Every service this system
+depends on — hosting, SMS, the classifier, secure email — is Medixly's service
+provider, and the custodian stays accountable for each of them. Being the only
+operator lowers the coordination cost, not the duty of care: the patients whose
+health information this holds are not parties to that simplification.
 
 ## Controls checklist
 
@@ -21,11 +30,15 @@ instructions. This distinction drives everything below.
 - [ ] **Access controls.** Pharmacy-scoped access. Session timeout on the
       pharmacist dashboard. Least-privilege IAM.
 - [ ] **Audit log.** Append-only record of every access, send, and classification.
-- [ ] **Data processing agreement** between Medixly and each pharmacy, disclosing
-      the subprocessor list: AWS, Twilio, Anthropic, Hushmail.
+- [ ] **Written agreement with every service provider** that touches PHI —
+      hosting, Twilio, Anthropic, Hushmail — and that same list disclosed to
+      patients in the privacy notice. There is no client pharmacy to sign an
+      agreement with; the accountability sits with Medixly either way.
 - [ ] **Retention and deletion schedule.** Documented, automated, honouring
       patient deletion requests.
-- [ ] **Privacy officer** named for each pharmacy.
+- [ ] **Privacy officer** named, with contact details published in the privacy
+      notice. A custodian needs a named contact even when it is a one-person
+      operation.
 - [ ] **Breach protocol** including mandatory notification to the Information and
       Privacy Commissioner of Ontario.
 - [ ] **Mandatory consent checkbox** on every patient-facing form — submit

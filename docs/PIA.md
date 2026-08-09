@@ -27,13 +27,26 @@ integration with a pharmacy management system.
 
 | Party | Role | Basis |
 |---|---|---|
-| The pharmacy | Health information custodian | PHIPA s.3(1) — operates a pharmacy within the meaning of the *Drug and Pharmacies Regulation Act* |
-| Medixly | Agent / electronic service provider | PHIPA s.2, s.10(4) — handles PHI on the custodian's behalf and on its instructions |
+| Medixly | Health information custodian | PHIPA s.3(1) — operates a pharmacy within the meaning of the *Drug and Pharmacies Regulation Act* |
 | Patient | Individual to whom the PHI relates | — |
 
-Medixly does not use the information for its own purposes and does not disclose
-it except back to the custodian. PIPEDA applies to Medixly's commercial
-handling of the data in parallel.
+There is no agent and no electronic service provider in this arrangement:
+Medixly is a single pharmacy that built and runs its own intake system, so the
+custodian and the operator are the same party. Nothing is handled "on the
+custodian's behalf" — it is handled by the custodian.
+
+The practical consequence is that accountability does not travel anywhere. There
+is no instructing party to defer to, and no second organisation whose agreement
+sets the limits of what may be done with the information. Every decision this
+document records is Medixly's own, and answerable to the patient and to the
+Information and Privacy Commissioner of Ontario.
+
+Whether **PIPEDA** applies alongside PHIPA is an open question — Ontario's PHIPA
+is recognised as substantially similar for health information held by a
+custodian, which is the basis on which PIPEDA is generally displaced for that
+information. The consent block on every patient-facing form currently names
+PIPEDA. See §10 and the open question in `web/HANDOFF.md`; this needs the
+privacy lawyer's answer before launch, not a guess here.
 
 **Required before pilot:** a written agreement between Medixly and each
 pharmacy setting out permitted uses, safeguards, breach notification, and

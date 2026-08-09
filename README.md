@@ -51,9 +51,16 @@ and the same reply logic with no carrier and no verification, and is the fastest
 to test. Keep the intent layer transport-agnostic so a future agent-callable API is
 another adapter rather than a rewrite.
 
-## Multi-tenancy
+## One pharmacy
 
-Every record is keyed by `pharmacy_id`. One deployment serves all Medixly pharmacies.
+Medixly is a single pharmacy running its own software, and the health information
+custodian for everything the system holds. There is no client pharmacy, no agent
+relationship and no tenant boundary to enforce.
+
+Records are still keyed by `pharmacy_id` and the column stays. It costs nothing,
+it keeps the audit log and the queue honest about which pharmacy a request
+belongs to, and removing it would be churn against a schema that already works.
+Treat it as one row, not as multi-tenancy.
 
 ## Docs
 

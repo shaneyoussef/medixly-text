@@ -8,7 +8,8 @@ Ordered so nothing waits on a phone number or a carrier approval.
 - [ ] CRA Business Number in hand — required for toll-free verification
 - [ ] Submit toll-free verification (SMS + voice enabled, MMS off)
 - [ ] Hushmail for Healthcare account
-- [ ] Draft data processing agreement template for pharmacy clients
+- [ ] Written agreements with the service providers that touch PHI (hosting,
+      Twilio, Anthropic, Hushmail) — not with client pharmacies; there are none
 
 Toll-free verification is mandatory: unverified numbers are blocked outright.
 Missing business registration details is the most common rejection reason.
