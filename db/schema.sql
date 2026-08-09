@@ -9,7 +9,7 @@ create extension if not exists "pgcrypto";
 -- pharmacies
 -- ---------------------------------------------------------------
 create table pharmacies (
-  id            text primary key,              -- 'oldpark'
+  id            text primary key,              -- 'medixly'
   name          text not null,
   phone         text not null,                 -- voice line, shown to patients
   notify_email  text not null,                 -- where new requests land
