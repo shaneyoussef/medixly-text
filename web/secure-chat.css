@@ -191,9 +191,12 @@ button,textarea{font-family:inherit}
 .mx-msg--me .mx-prog{background:var(--ink-700)}
 
 /* ── Voice notes ──────────────────────────────────────────────────── */
-.mx-mic{background:var(--action-secondary)}
-.mx-mic:hover:not(:disabled){background:var(--action-secondary-hover)}
-.mx-mic[hidden],.mx-row[hidden],.mx-rec[hidden]{display:none}
+/* The mic sits in the send slot and only recolours it, so it has to outrank
+   .mx-send — which is declared further down this file. */
+.mx-send.mx-mic{background:var(--action-secondary)}
+.mx-send.mx-mic:hover:not(:disabled){background:var(--action-secondary-hover)}
+/* .mx-send sets display:flex, which beats the hidden attribute on its own. */
+.mx-mic[hidden],.mx-send[hidden],.mx-row[hidden],.mx-rec[hidden]{display:none}
 
 .mx-rec{display:flex;align-items:center;gap:var(--space-3);min-height:var(--field-height)}
 .mx-rec__dot{width:var(--space-2);height:var(--space-2);flex:none;border-radius:var(--radius-circle);
