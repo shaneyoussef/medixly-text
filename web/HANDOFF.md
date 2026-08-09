@@ -11,17 +11,20 @@ missing, and what to build next.
 All files live in `web/`. They were previously one 106KB `secure-chat.html`;
 the split version replaces it in place.
 
-| File | What's in it |
-| --- | --- |
-| `secure-chat.html` | Shell. Markup only, loads everything below. |
-| `ds-tokens.css` | Copy of the Medixly design tokens so the page opens standalone. In the app, drop it and link the real design system. |
-| `secure-chat.css` | All chat styling. |
-| `secure-chat.auth.css` | Sign-in gate styling. |
-| `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. |
-| `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. |
-| `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. |
-| `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. |
-| `secure-chat.demo.js` | Stub transport and boot. Replace to go live. |
+**Two files have not landed yet.** Until `secure-chat.forms.js` does, the page
+does not run: `mount()` calls `renderServices()`, which reads `SERVICES`.
+
+| File | What's in it | Landed |
+| --- | --- | --- |
+| `secure-chat.html` | Shell. Markup only, loads everything below. | yes |
+| `ds-tokens.css` | Copy of the Medixly design tokens so the page opens standalone. In the app, drop it and link the real design system. | yes |
+| `secure-chat.css` | All chat styling. | yes |
+| `secure-chat.auth.css` | Sign-in gate styling. | yes |
+| `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
+| `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | **no** |
+| `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
+| `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **no** |
+| `secure-chat.demo.js` | Stub transport and boot. Replace to go live. | yes |
 
 ### Features built
 
@@ -30,6 +33,9 @@ photo library or file, with client-side downscaling to 2048px. Voice notes with
 waveform capture and playback. A horizontally scrolling service rail. Five
 paginated form cards — transfer, refill, upload, vaccine booking, minor ailment
 assessment — each 3–6 short pages ending in review, consent, submit.
+
+The service rail and the five form cards are rendered by `core` but defined in
+`forms`, so neither appears until that file lands.
 
 ### Load order matters
 
@@ -130,7 +136,13 @@ system answers the substantive part of any patient request.
 
 ## Tasks
 
-1. **Confirm the split page loads.** It replaces the old monolith in place.
+1. **Confirm the split page loads.** The shell has replaced the old monolith in
+   place and was checked in Chromium against the real `core`, `auth` and `demo`
+   files, with throwaway stubs standing in for the two that hadn't landed:
+   history renders with day dividers, the composer flips mic to send, the attach
+   sheet traps focus and closes on Escape, and a sent message runs sending →
+   delivered → read. Re-run this against the real `forms` and `print` once they
+   land — that is the check that counts.
 
 2. **`SecureChat.prototype.setProfile(profile)`** in core — store `this.profile`,
    re-render open form cards.
