@@ -6,281 +6,36 @@
 <title>Secure chat — Old Park Pharmacy</title>
 
 <!--
-  Medixly · Patient secure chat
-  ─────────────────────────────
-  Self-contained so it can be opened directly. In the real app, delete the
-  <style id="ds-tokens"> block below and link the design system instead:
+  Medixly · Patient secure chat — shell
+  ────────────────────────────────────
+  Markup only. Styling and behaviour live in the files loaded below; the
+  file map and the reasons behind the split are in web/HANDOFF.md.
+
+  `ds-tokens.css` is a standalone copy of the Medixly design tokens so this
+  page opens on its own. In the real app, drop it and link the design
+  system instead:
 
     <link rel="stylesheet" href="_ds/medixly-design-system-.../styles.css">
 
-  Every value in this file comes from a design-system token — no raw hex,
-  no off-scale sizes. Wiring instructions are at the bottom of the script.
+  Every value comes from a design-system token — no raw hex, no off-scale
+  sizes. Wiring instructions are at the bottom of secure-chat.demo.js.
+
+  Script order matters: core → forms → auth → print → demo. Nothing is
+  referenced at evaluation time across files, but `demo` constructs
+  everything, so it goes last.
+
+  The sign-in gate is not in this markup — `AuthGate` builds it and appends
+  it to `.mx-chat` itself.
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 
-<style id="ds-tokens">
-/* ── tokens/colors.css ─────────────────────────────────────────────── */
-:root{
---paper-50:#FAF6EF; --paper-100:#F3EBDE; --paper-200:#E9DCC8; --paper-300:#E3D2BE;
---paper-400:#DAC8B2; --paper-500:#C9B49B; --paper-600:#A79279;
-
---ink-900:#12263D; --ink-800:#1B3A5F; --ink-700:#264E7C; --ink-600:#1B5194;
---ink-500:#2E6BB4; --ink-400:#6C8FBE; --ink-300:#869EBF; --ink-200:#B7C6DB; --ink-100:#DDE5EF;
-
---teal-700:#4E7480; --teal-600:#6C909E; --teal-500:#8AABAB; --teal-300:#B3CBC9; --teal-100:#DCE9E6;
-
---clay-700:#A8441F; --clay-600:#C25128; --clay-500:#CE5B2F; --clay-400:#D56430; --clay-300:#E79A76; --clay-100:#F6DFD3;
-
---success-600:#3E7A5E; --success-100:#DDEBE3;
---warning-600:#B8801E; --warning-100:#F7EBD2;
---danger-600:#B23A2E;  --danger-100:#F7DFDB;
---info-600:var(--ink-600); --info-100:var(--ink-100);
-
---surface-page:var(--paper-100);
---surface-card:#FFFDF9;
---surface-sunken:var(--paper-200);
---surface-inverse:var(--ink-800);
---surface-accent-soft:var(--clay-100);
---surface-teal-soft:var(--teal-100);
-
---text-strong:var(--ink-900);
---text-body:var(--ink-800);
---text-muted:#5B6E82;
---text-subtle:#8194A5;
---text-on-dark:var(--paper-100);
---text-on-accent:#FFF8F1;
---text-link:var(--ink-600);
---text-link-hover:var(--ink-800);
-
---border-subtle:#E2D8C8;
---border-default:#D2C4AF;
---border-strong:var(--ink-800);
---border-focus:var(--ink-600);
-
---action-primary:var(--clay-500);
---action-primary-hover:var(--clay-600);
---action-primary-active:var(--clay-700);
---action-secondary:var(--ink-800);
---action-secondary-hover:var(--ink-900);
---focus-ring:0 0 0 3px rgba(27,81,148,.32);
-}
-/* ── tokens/typography.css ─────────────────────────────────────────── */
-:root{
---font-display:"Poppins","Trebuchet MS",sans-serif;
---font-sans:"Source Sans 3","Segoe UI",system-ui,sans-serif;
---font-mono:"IBM Plex Mono",ui-monospace,monospace;
-
---text-display:2.75rem; --text-h1:2.125rem; --text-h2:1.625rem; --text-h3:1.25rem;
---text-lg:1.125rem; --text-base:1rem; --text-sm:.875rem; --text-xs:.75rem;
-
---leading-tight:1.12; --leading-snug:1.3; --leading-normal:1.55; --leading-relaxed:1.7;
---weight-regular:400; --weight-medium:500; --weight-semibold:600; --weight-bold:700;
---tracking-tight:-.02em; --tracking-normal:0; --tracking-wide:.04em; --tracking-caps:.12em;
-}
-/* ── tokens/spacing.css ────────────────────────────────────────────── */
-:root{
---space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px;
---space-6:24px; --space-8:32px; --space-10:40px; --space-12:48px; --space-16:64px;
---space-20:80px; --space-24:96px;
---gutter:24px; --section-y:80px; --container-max:1120px; --container-narrow:680px;
---field-height:48px; --touch-min:48px;
-}
-/* ── tokens/radius.css ─────────────────────────────────────────────── */
-:root{
---radius-xs:4px; --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-xl:24px;
---radius-pill:999px; --radius-circle:50%;
---radius-card:var(--radius-lg); --radius-button:var(--radius-md); --radius-field:var(--radius-sm);
-}
-/* ── tokens/elevation.css ──────────────────────────────────────────── */
-:root{
---shadow-cut:0 2px 0 rgba(18,38,61,.10);
---shadow-sm:0 1px 2px rgba(18,38,61,.08), 0 2px 6px rgba(18,38,61,.05);
---shadow-md:0 4px 10px rgba(18,38,61,.10), 0 1px 2px rgba(18,38,61,.06);
---shadow-lg:0 12px 28px rgba(18,38,61,.14);
---shadow-inset:inset 0 1px 2px rgba(18,38,61,.10);
---shadow-press:inset 0 2px 4px rgba(18,38,61,.18);
-}
-/* ── tokens/motion.css ─────────────────────────────────────────────── */
-:root{
---ease-standard:cubic-bezier(.4,0,.2,1);
---ease-out:cubic-bezier(.16,1,.3,1);
---ease-in:cubic-bezier(.4,0,1,1);
---duration-fast:120ms; --duration-base:180ms; --duration-slow:320ms;
---transition-control:background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
-}
-@media (prefers-reduced-motion:reduce){:root{--duration-fast:0ms;--duration-base:0ms;--duration-slow:0ms}}
-/* ── tokens/base.css ───────────────────────────────────────────────── */
-body{font-family:var(--font-sans);color:var(--text-body);background:var(--surface-page);font-size:var(--text-base);line-height:var(--leading-normal);-webkit-font-smoothing:antialiased}
-h1,h2,h3,h4{font-family:var(--font-display);color:var(--text-strong);font-weight:var(--weight-semibold);line-height:var(--leading-tight);letter-spacing:var(--tracking-tight);margin:0}
-:focus-visible{outline:none;box-shadow:var(--focus-ring);border-radius:var(--radius-xs)}
-</style>
-
-<style id="chat-styles">
-*,*::before,*::after{box-sizing:border-box}
-body{margin:0;background:var(--paper-200);display:flex;align-items:center;justify-content:center;min-height:100dvh}
-button,textarea{font-family:inherit}
-
-/* ── Icons: Lucide, masked so they inherit currentColor (Icon.jsx) ─── */
-.mx-icon{display:inline-block;flex:0 0 auto;width:var(--space-5);height:var(--space-5);
-  background-color:currentColor;
-  -webkit-mask:var(--icon) center/contain no-repeat;mask:var(--icon) center/contain no-repeat}
-.mx-icon--sm{width:var(--space-4);height:var(--space-4)}
-
-.mx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-
-/* ── Shell ─────────────────────────────────────────────────────────── */
-.mx-chat{display:flex;flex-direction:column;width:100%;max-width:420px;height:100dvh;
-  background:var(--paper-100);color:var(--ink-900);overflow:hidden}
-@media (min-width:480px) and (min-height:760px){
-  .mx-chat{height:min(880px, calc(100dvh - var(--space-12)));
-    border:1px solid var(--border-subtle);border-radius:var(--radius-xl);box-shadow:var(--shadow-lg)}
-}
-
-/* ── Header ────────────────────────────────────────────────────────── */
-.mx-header{flex:none;z-index:2;display:flex;align-items:center;gap:var(--space-3);
-  padding:var(--space-2) var(--space-3);
-  padding-top:calc(var(--space-2) + env(safe-area-inset-top, 0px));
-  background:color-mix(in srgb, var(--paper-50) 88%, transparent);
-  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border-subtle)}
-
-.mx-iconbtn{width:var(--touch-min);height:var(--touch-min);flex:none;display:flex;
-  align-items:center;justify-content:center;border:none;background:transparent;
-  color:var(--ink-800);border-radius:var(--radius-md);cursor:pointer;
-  transition:var(--transition-control)}
-.mx-iconbtn:hover{background:var(--paper-200)}
-.mx-iconbtn:active{box-shadow:var(--shadow-press)}
-.mx-iconbtn--outline{border:1.5px solid var(--border-default);background:var(--surface-card)}
-
-.mx-avatar{width:var(--space-10);height:var(--space-10);flex:none;display:flex;
-  align-items:center;justify-content:center;border-radius:var(--radius-circle);
-  background:var(--ink-800);color:var(--paper-50);
-  font-family:var(--font-display);font-weight:var(--weight-semibold);
-  font-size:var(--text-sm);letter-spacing:var(--tracking-tight)}
-
-.mx-identity{flex:1;min-width:0}
-.mx-name{font-family:var(--font-display);font-weight:var(--weight-semibold);
-  font-size:var(--text-base);letter-spacing:var(--tracking-tight);line-height:var(--leading-snug);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mx-presence{display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-1);
-  font-size:var(--text-xs);line-height:var(--leading-snug);color:var(--teal-700)}
-.mx-dot{width:var(--space-2);height:var(--space-2);flex:none;border-radius:var(--radius-circle);
-  background:var(--success-600)}
-.mx-dot--away{background:var(--paper-500)}
-
-/* ── Transcript ────────────────────────────────────────────────────── */
-.mx-body{position:relative;flex:1;min-height:0;display:flex}
-.mx-log{flex:1;min-width:0;overflow-y:auto;overscroll-behavior:contain;
-  padding:var(--space-4) var(--space-4) var(--space-2);
-  display:flex;flex-direction:column;gap:var(--space-3)}
-
-.mx-notice{display:flex;align-items:flex-start;gap:var(--space-3);
-  background:var(--teal-100);border-radius:var(--radius-lg);
-  padding:var(--space-3) var(--space-4);margin-bottom:var(--space-1)}
-.mx-notice .mx-icon{margin-top:var(--space-1);color:var(--teal-700)}
-.mx-notice p{margin:0;font-size:var(--text-sm);line-height:var(--leading-normal);color:var(--ink-800)}
-
-.mx-day{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) 0}
-.mx-day::before,.mx-day::after{content:"";flex:1;height:1px;background:var(--border-subtle)}
-.mx-day span{font-family:var(--font-mono);font-size:var(--text-xs);
-  letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--paper-600)}
-
-[data-stream]{display:flex;flex-direction:column;gap:var(--space-3)}
-.mx-msg{display:flex;flex-direction:column;max-width:80%}
-.mx-msg--them{align-items:flex-start;align-self:flex-start}
-.mx-msg--me{align-items:flex-end;align-self:flex-end}
-
-.mx-bubble{padding:var(--space-3) var(--space-4);font-size:var(--text-base);
-  line-height:var(--leading-normal);white-space:pre-wrap;overflow-wrap:anywhere;text-wrap:pretty}
-.mx-msg--them .mx-bubble{background:var(--surface-card);border:1px solid var(--border-subtle);
-  box-shadow:var(--shadow-cut);color:var(--ink-900);
-  border-radius:var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-xs)}
-.mx-msg--me .mx-bubble{background:var(--ink-800);color:var(--paper-50);
-  border-radius:var(--radius-lg) var(--radius-lg) var(--radius-xs) var(--radius-lg)}
-
-.mx-file{display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-2);
-  padding-bottom:var(--space-2);border-bottom:1px solid var(--border-subtle);
-  font-size:var(--text-sm)}
-.mx-msg--me .mx-file{border-bottom-color:var(--ink-700)}
-.mx-file:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
-.mx-file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-.mx-meta{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--paper-600);
-  margin-top:var(--space-1);padding:0 var(--space-1)}
-.mx-meta--failed{color:var(--danger-600);background:none;border:none;cursor:pointer;
-  font-family:var(--font-mono);font-size:var(--text-xs)}
-
-.mx-typing{display:flex;align-items:center;gap:var(--space-1);width:fit-content;
-  padding:var(--space-4);background:var(--surface-card);border:1px solid var(--border-subtle);
-  border-radius:var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-xs)}
-.mx-typing i{width:var(--space-2);height:var(--space-2);border-radius:var(--radius-circle);
-  background:var(--ink-300);animation:mx-dot 1.1s infinite}
-.mx-typing i:nth-child(2){animation-delay:.15s}
-.mx-typing i:nth-child(3){animation-delay:.3s}
-@keyframes mx-dot{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
-
-.mx-enter{animation:mx-enter var(--duration-base) var(--ease-out) both}
-@keyframes mx-enter{from{opacity:0;transform:translateY(var(--space-2))}to{opacity:1;transform:none}}
-
-.mx-jump{position:absolute;left:50%;bottom:var(--space-4);transform:translateX(-50%);
-  display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-4);
-  border:1px solid var(--border-subtle);background:var(--surface-card);color:var(--ink-800);
-  border-radius:var(--radius-pill);box-shadow:var(--shadow-md);cursor:pointer;
-  font-size:var(--text-sm);transition:var(--transition-control)}
-.mx-jump:hover{background:var(--paper-200)}
-.mx-jump[hidden]{display:none}
-
-/* ── Composer ──────────────────────────────────────────────────────── */
-.mx-composer{flex:none;border-top:1px solid var(--border-subtle);background:var(--paper-50);
-  padding:var(--space-3) var(--space-4);
-  padding-bottom:calc(var(--space-3) + env(safe-area-inset-bottom, 0px))}
-.mx-chips{display:flex;flex-wrap:wrap;gap:var(--space-2);padding-bottom:var(--space-3)}
-.mx-chips:empty{display:none}
-.mx-chip{display:flex;align-items:center;gap:var(--space-2);max-width:100%;
-  padding:var(--space-1) var(--space-1) var(--space-1) var(--space-3);
-  background:var(--surface-card);border:1px solid var(--border-subtle);
-  border-radius:var(--radius-pill);font-size:var(--text-sm);color:var(--ink-800)}
-.mx-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mx-chip button{display:flex;align-items:center;justify-content:center;width:var(--space-6);
-  height:var(--space-6);border:none;background:transparent;color:var(--text-muted);
-  border-radius:var(--radius-circle);cursor:pointer}
-.mx-chip button:hover{background:var(--paper-200);color:var(--ink-900)}
-
-.mx-row{display:flex;align-items:flex-end;gap:var(--space-3)}
-.mx-attach{width:var(--field-height);height:var(--field-height);flex:none;display:flex;
-  align-items:center;justify-content:center;border:1.5px solid var(--border-default);
-  background:var(--surface-card);color:var(--ink-800);border-radius:var(--radius-field);
-  cursor:pointer;transition:var(--transition-control)}
-.mx-attach:hover{background:var(--paper-200)}
-
-.mx-input{flex:1;min-width:0;min-height:var(--field-height);
-  max-height:calc(var(--space-20) + var(--space-10));resize:none;
-  padding:var(--space-3) var(--space-4);border:1.5px solid var(--border-default);
-  border-radius:var(--radius-field);background:var(--surface-card);color:var(--ink-900);
-  font-size:var(--text-base);line-height:var(--leading-snug);outline:none;
-  transition:var(--transition-control)}
-.mx-input:focus{border-color:var(--border-focus);box-shadow:var(--focus-ring)}
-.mx-input::placeholder{color:var(--text-subtle)}
-
-.mx-send{width:var(--field-height);height:var(--field-height);flex:none;display:flex;
-  align-items:center;justify-content:center;border:none;background:var(--action-primary);
-  color:var(--text-on-accent);border-radius:var(--radius-button);box-shadow:var(--shadow-cut);
-  cursor:pointer;transition:var(--transition-control)}
-.mx-send:hover:not(:disabled){background:var(--action-primary-hover)}
-.mx-send:active:not(:disabled){box-shadow:var(--shadow-press);transform:translateY(1px);
-  background:var(--action-primary-active)}
-.mx-send:disabled{background:var(--paper-400);color:var(--paper-600);box-shadow:none;cursor:default}
-
-.mx-trust{display:flex;align-items:flex-start;justify-content:center;gap:var(--space-2);
-  padding-top:var(--space-3);color:var(--teal-700);font-size:var(--text-xs);
-  line-height:var(--leading-snug);text-align:center}
-.mx-trust .mx-icon{margin-top:1px}
-</style>
+<link rel="stylesheet" href="ds-tokens.css">
+<link rel="stylesheet" href="secure-chat.css">
+<link rel="stylesheet" href="secure-chat.auth.css">
 </head>
-
 <body>
 <div class="mx-chat" id="chat">
 
@@ -315,361 +70,97 @@ button,textarea{font-family:inherit}
     </button>
   </div>
 
+  <!-- Service rail. Filled from SERVICES in secure-chat.forms.js. -->
+  <div class="mx-quick" data-quick role="group" aria-label="Common requests"></div>
+
   <div class="mx-composer">
+    <p class="mx-alert" data-error hidden></p>
     <div class="mx-chips" data-chips></div>
-    <div class="mx-row">
-      <button type="button" class="mx-attach" data-attach aria-label="Attach a photo of your prescription">
+
+    <div class="mx-row" data-row>
+      <button type="button" class="mx-attach" data-attach aria-label="Attach a photo or a file"
+              aria-haspopup="dialog" aria-expanded="false">
         <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/upload.svg)"></i>
       </button>
-      <input type="file" data-file hidden multiple accept="image/*,application/pdf">
+
+      <!-- Three pickers, so the sheet can offer the camera separately from the library. -->
+      <input type="file" data-camera hidden accept="image/*" capture="environment">
+      <input type="file" data-photos hidden multiple accept="image/*">
+      <input type="file" data-docs hidden multiple accept="application/pdf,image/*">
+
       <textarea class="mx-input" data-input rows="1" placeholder="Write a message" aria-label="Write a message"></textarea>
+
+      <button type="button" class="mx-send mx-mic" data-mic aria-label="Record a voice note" hidden>
+        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/mic.svg)"></i>
+      </button>
       <button type="button" class="mx-send" data-send aria-label="Send" disabled>
         <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/arrow-up.svg)"></i>
       </button>
     </div>
+
+    <!-- Replaces the row while recording. -->
+    <div class="mx-rec" data-rec hidden>
+      <span class="mx-rec__dot" aria-hidden="true"></span>
+      <span class="mx-timer" data-timer>0:00</span>
+      <div class="mx-bars" data-levels aria-hidden="true"></div>
+      <button type="button" class="mx-iconbtn" data-rec-cancel aria-label="Discard recording">
+        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/trash-2.svg)"></i>
+      </button>
+      <button type="button" class="mx-send" data-rec-stop aria-label="Stop recording">
+        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/check.svg)"></i>
+      </button>
+    </div>
+
     <p class="mx-trust">
       <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/lock.svg)"></i>
       <span data-trust>Your information is transmitted securely via Hushmail for Healthcare — PIPEDA compliant</span>
     </p>
   </div>
 
+  <!-- Attach sheet -->
+  <div class="mx-scrim" data-scrim hidden>
+    <div class="mx-sheet" data-sheet role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <h2 id="sheet-title">Attach something</h2>
+      <p>Photos and PDFs, up to 5 files at 10 MB each.</p>
+
+      <button type="button" class="mx-option" data-pick="camera">
+        <span class="mx-disc mx-disc--ink">
+          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/camera.svg)"></i>
+        </span>
+        Take a photo
+      </button>
+      <button type="button" class="mx-option" data-pick="photos">
+        <span class="mx-disc mx-disc--teal">
+          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/image.svg)"></i>
+        </span>
+        Photo library
+      </button>
+      <button type="button" class="mx-option" data-pick="docs">
+        <span class="mx-disc mx-disc--clay">
+          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/file-text.svg)"></i>
+        </span>
+        Choose a file
+      </button>
+
+      <button type="button" class="mx-cancel" data-sheet-cancel>Cancel</button>
+    </div>
+  </div>
+
+  <!-- Image viewer -->
+  <div class="mx-viewer" data-viewer hidden>
+    <img data-viewer-img alt="Attachment">
+    <button type="button" class="mx-iconbtn" data-viewer-close aria-label="Close">
+      <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/x.svg)"></i>
+    </button>
+  </div>
+
   <p class="mx-sr" data-announce role="status" aria-live="polite"></p>
 </div>
 
-<script>
-/* ════════════════════════════════════════════════════════════════════
-   SecureChat — view layer only. All I/O goes through `transport`.
-   ════════════════════════════════════════════════════════════════════ */
-
-const ICONS = 'https://unpkg.com/lucide-static@0.454.0/icons/';
-
-function el(tag, cls, text) {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text != null) n.textContent = text;   // textContent: never innerHTML
-  return n;
-}
-function icon(name, small) {
-  const i = el('i', 'mx-icon' + (small ? ' mx-icon--sm' : ''));
-  i.style.setProperty('--icon', `url(${ICONS}${name}.svg)`);
-  return i;
-}
-const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'm' + Date.now() + Math.random().toString(16).slice(2));
-const fmtTime = ts => new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-const dayKey  = ts => new Date(ts).toDateString();
-
-function dayLabel(ts) {
-  const d = new Date(ts), now = new Date();
-  const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) -
-                           new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7)   return d.toLocaleDateString(undefined, { weekday: 'long' });
-  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
-}
-
-const COUNTRY = {
-  Canada: { platform: 'Hushmail for Healthcare', law: 'PIPEDA' },
-  USA:    { platform: 'Paubox', law: 'HIPAA' }
-};
-
-class SecureChat {
-  /**
-   * @param {HTMLElement} root
-   * @param {object} opts
-   *   pharmacyName, presence, country ('Canada' | 'USA'), history[]
-   *   transport: { send(msg) -> Promise<{status,ts}>, subscribe(fn), upload(file) }
-   *   onBack(), onCall()
-   */
-  constructor(root, opts = {}) {
-    this.root = root;
-    this.opts = opts;
-    this.messages = [];
-    this.pending = [];          // staged attachments
-    this.typing = false;
-    this.stick = true;          // pinned to the newest message
-    this.seen = new Set();      // ids already animated in
-    this.$ = sel => root.querySelector(`[data-${sel}]`);
-    this.mount();
-  }
-
-  mount() {
-    const o = this.opts;
-    if (o.pharmacyName) {
-      this.$('name').textContent = o.pharmacyName;
-      this.$('avatar').textContent = o.pharmacyName.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-      this.$('log').setAttribute('aria-label', `Conversation with ${o.pharmacyName}`);
-    }
-    if (o.presence) this.setPresence(o.presence);
-
-    const c = COUNTRY[o.country] || COUNTRY.Canada;
-    this.$('trust').textContent =
-      `Your information is transmitted securely via ${c.platform} — ${c.law} compliant`;
-
-    const input = this.$('input'), send = this.$('send'), log = this.$('log');
-
-    input.addEventListener('input', () => {
-      input.style.height = 'auto';
-      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-      this.syncSend();
-    });
-    // Physical keyboards send on Enter; touch keyboards insert a newline.
-    this.softKeyboard = window.matchMedia('(pointer:coarse)').matches;
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey && !this.softKeyboard) { e.preventDefault(); this.send(); }
-    });
-    send.addEventListener('click', () => this.send());
-
-    this.$('attach').addEventListener('click', () => this.$('file').click());
-    this.$('file').addEventListener('change', e => { this.stage([...e.target.files]); e.target.value = ''; });
-
-    log.addEventListener('scroll', () => {
-      this.stick = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-      this.$('jump').hidden = this.stick;
-    });
-    this.$('jump').addEventListener('click', () => { this.stick = true; this.$('jump').hidden = true; this.scrollDown(); });
-
-    this.$('back').addEventListener('click', () => this.opts.onBack?.());
-    this.$('call').addEventListener('click', () => this.opts.onCall?.());
-
-    if (o.history) this.load(o.history);
-    o.transport?.subscribe?.(m => this.receive(m));
-  }
-
-  /* ── Public API ──────────────────────────────────────────────── */
-
-  load(messages) {
-    this.messages = messages.map(m => ({ id: m.id || uid(), status: 'read', ...m }));
-    this.messages.forEach(m => this.seen.add(m.id));   // history doesn't animate
-    this.render();
-    requestAnimationFrame(() => this.scrollDown('auto'));
-  }
-
-  /** Adds an inbound message from the pharmacy. */
-  receive({ text, ts = Date.now(), files }) {
-    this.setTyping(false);
-    const m = { id: uid(), from: 'them', text, ts, files };
-    this.messages.push(m);
-    this.render();
-    this.$('announce').textContent = `New message from ${this.$('name').textContent}: ${text}`;
-  }
-
-  setTyping(on) { if (this.typing !== on) { this.typing = on; this.render(); } }
-
-  setPresence(text, state = 'online') {
-    this.$('presence').textContent = text;
-    this.$('presence-dot').classList.toggle('mx-dot--away', state !== 'online');
-  }
-
-  setStatus(id, status, ts) {
-    const m = this.messages.find(x => x.id === id);
-    if (!m) return;
-    m.status = status;
-    if (ts) m.ts = ts;
-    this.render();
-  }
-
-  /* ── Sending ─────────────────────────────────────────────────── */
-
-  stage(files) {
-    this.pending.push(...files);
-    this.renderChips();
-    this.syncSend();
-  }
-  unstage(i) { this.pending.splice(i, 1); this.renderChips(); this.syncSend(); }
-
-  syncSend() {
-    this.$('send').disabled = !this.$('input').value.trim() && !this.pending.length;
-  }
-
-  async send() {
-    const input = this.$('input');
-    const text = input.value.trim();
-    if (!text && !this.pending.length) return;
-
-    const m = {
-      id: uid(), from: 'me', text, ts: Date.now(), status: 'sending',
-      files: this.pending.map(f => ({ name: f.name, size: f.size, type: f.type }))
-    };
-    const payload = { ...m, blobs: this.pending };
-
-    this.messages.push(m);
-    input.value = ''; input.style.height = 'auto';
-    this.pending = []; this.renderChips(); this.syncSend();
-    this.stick = true; this.render();
-
-    try {
-      const res = (await this.opts.transport?.send?.(payload)) || {};
-      this.setStatus(m.id, res.status || 'sent', res.ts);
-    } catch (err) {
-      console.error('[SecureChat] send failed', err);
-      this.setStatus(m.id, 'failed');
-    }
-  }
-
-  retry(id) {
-    const m = this.messages.find(x => x.id === id);
-    if (!m) return;
-    this.setStatus(id, 'sending');
-    Promise.resolve(this.opts.transport?.send?.(m))
-      .then(res => this.setStatus(id, (res && res.status) || 'sent', res && res.ts))
-      .catch(() => this.setStatus(id, 'failed'));
-  }
-
-  /* ── Rendering ───────────────────────────────────────────────── */
-
-  metaText(m) {
-    if (m.from === 'them') return fmtTime(m.ts);
-    return { sending: 'Sending…', failed: 'Not sent — tap to retry' }[m.status]
-      || `${{ sent: 'Sent', delivered: 'Delivered', read: 'Read' }[m.status] || 'Sent'} ${fmtTime(m.ts)}`;
-  }
-
-  messageEl(m) {
-    const wrap = el('div', `mx-msg mx-msg--${m.from === 'me' ? 'me' : 'them'}`);
-    if (!this.seen.has(m.id)) { wrap.classList.add('mx-enter'); this.seen.add(m.id); }
-
-    const bubble = el('div', 'mx-bubble');
-    (m.files || []).forEach(f => {
-      const row = el('div', 'mx-file');
-      row.append(icon(f.type && f.type.startsWith('image/') ? 'image' : 'file-text', true), el('span', null, f.name));
-      bubble.append(row);
-    });
-    if (m.text) bubble.append(el('span', null, m.text));
-    wrap.append(bubble);
-
-    if (m.status === 'failed') {
-      const b = el('button', 'mx-meta mx-meta--failed', this.metaText(m));
-      b.type = 'button';
-      b.addEventListener('click', () => this.retry(m.id));
-      wrap.append(b);
-    } else {
-      wrap.append(el('div', 'mx-meta', this.metaText(m)));
-    }
-    return wrap;
-  }
-
-  render() {
-    const frag = document.createDocumentFragment();
-    let day = null;
-    for (const m of this.messages) {
-      const k = dayKey(m.ts);
-      if (k !== day) {
-        day = k;
-        const d = el('div', 'mx-day');
-        d.append(el('span', null, dayLabel(m.ts)));
-        frag.append(d);
-      }
-      frag.append(this.messageEl(m));
-    }
-    if (this.typing) {
-      const t = el('div', 'mx-typing');
-      t.setAttribute('aria-label', 'Typing');
-      t.append(el('i'), el('i'), el('i'));
-      frag.append(t);
-    }
-    this.$('stream').replaceChildren(frag);
-    if (this.stick) this.scrollDown();
-  }
-
-  renderChips() {
-    const box = this.$('chips');
-    box.replaceChildren(...this.pending.map((f, i) => {
-      const chip = el('div', 'mx-chip');
-      const x = el('button');
-      x.type = 'button';
-      x.setAttribute('aria-label', `Remove ${f.name}`);
-      x.append(icon('x', true));
-      x.addEventListener('click', () => this.unstage(i));
-      chip.append(icon(f.type.startsWith('image/') ? 'image' : 'file-text', true), el('span', null, f.name), x);
-      return chip;
-    }));
-  }
-
-  scrollDown(behavior) {
-    const log = this.$('log');
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    log.scrollTo({ top: log.scrollHeight, behavior: behavior || (reduce ? 'auto' : 'smooth') });
-  }
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   Demo wiring — replace everything below to go live.
-   ════════════════════════════════════════════════════════════════════ */
-
-const at = (daysAgo, h, m) => {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  d.setHours(h, m, 0, 0);
-  return d.getTime();
-};
-
-const seed = [
-  { from: 'them', text: 'Hi Maya — your refill for Metformin 500 mg is ready for pickup. We\u2019re open until 8pm today.', ts: at(1, 14, 14) },
-  { from: 'me',   text: 'Thanks! Could I pick it up tomorrow morning instead?', ts: at(1, 14, 31) },
-  { from: 'them', text: 'Of course. We\u2019ll hold it on the shelf for seven days.', ts: at(1, 14, 35) },
-  { from: 'me',   text: 'One more thing — should I keep taking it with food?', ts: at(0, 9, 2) },
-  { from: 'them', text: 'Yes. Take it with your largest meal to reduce stomach upset. If you miss a dose, skip it and take the next one at the usual time — don\u2019t double up.', ts: at(0, 9, 10) }
-];
-
-// A fake transport that mimics delivery receipts and a pharmacist reply.
-const demoTransport = {
-  send(msg) {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        resolve({ status: 'delivered', ts: Date.now() });
-        setTimeout(() => chat.setStatus(msg.id, 'read'), 1200);
-        setTimeout(() => chat.setTyping(true), 1800);
-        setTimeout(() => chat.receive({
-          text: 'Thanks Maya — a pharmacist has your message and will reply shortly. If this is urgent, call us at [Phone Number].'
-        }), 3600);
-      }, 700);
-    });
-  },
-  subscribe() {},
-  upload(file) { return Promise.resolve({ url: URL.createObjectURL(file) }); }
-};
-
-const chat = new SecureChat(document.getElementById('chat'), {
-  pharmacyName: 'Old Park Pharmacy',
-  presence: 'Pharmacist on duty · replies within 2 hours',
-  country: 'Canada',
-  history: seed,
-  transport: demoTransport,
-  onBack: () => console.log('[SecureChat] back'),
-  onCall: () => console.log('[SecureChat] call [Phone Number]')
-});
-
-/* ── Going live ───────────────────────────────────────────────────────
-   Swap `demoTransport` for the real one. Nothing else changes.
-
-   const transport = {
-     async send(msg) {                       // msg: {id, text, ts, files, blobs}
-       const r = await fetch('/api/chat/send', {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ id: msg.id, text: msg.text, files: msg.files })
-       });
-       if (!r.ok) throw new Error(r.statusText);  // → bubble shows "Not sent — tap to retry"
-       return r.json();                           // → { status: 'delivered', ts }
-     },
-     subscribe(onMessage) {                  // SSE, WebSocket, or polling
-       new EventSource('/api/chat/stream')
-         .addEventListener('message', e => onMessage(JSON.parse(e.data)));
-     },
-     upload(file) { … }                      // returns { url } for attachments
-   };
-
-   Other hooks:
-     chat.setPresence('Closed — we reply at 9am', 'away');
-     chat.setTyping(true);
-     chat.receive({ text: 'Your prescription is ready.' });
-     chat.setStatus(id, 'read');
-
-   Compliance note: message bodies must travel over the pharmacy's configured
-   secure platform (Canada → Hushmail for Healthcare / PIPEDA, USA → Paubox /
-   HIPAA). Pass `country` to keep the trust badge in sync, and log a consent
-   timestamp when the patient first opens a thread.
-─────────────────────────────────────────────────────────────────────── */
-</script>
+<script src="secure-chat.core.js"></script>
+<script src="secure-chat.forms.js"></script>
+<script src="secure-chat.auth.js"></script>
+<script src="secure-chat.print.js"></script>
+<script src="secure-chat.demo.js"></script>
 </body>
 </html>
