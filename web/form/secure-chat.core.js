@@ -228,6 +228,20 @@ class SecureChat {
     this.$('presence-dot').classList.toggle('mx-dot--away', state !== 'online');
   }
 
+  /**
+   * Stores the signed-in profile and rebuilds any form card still open, so a
+   * card drawn before sign-in can pick the profile up. Submitted cards are
+   * receipts and are left alone. Consent is never carried across — it belongs
+   * to one submission and needs its own timestamp.
+   */
+  setProfile(profile) {
+    this.profile = profile;
+    for (const m of this.messages) {
+      if (m.kind === 'form' && !m.submitted) this.forms.delete(m.id);
+    }
+    this.render();
+  }
+
   setStatus(id, status, ts) {
     const m = this.messages.find(x => x.id === id);
     if (!m) return;
