@@ -147,8 +147,10 @@ system answers the substantive part of any patient request.
    delivered → read. Re-run this against the real `forms` and `print` once they
    land — that is the check that counts.
 
-2. **`SecureChat.prototype.setProfile(profile)`** in core — store `this.profile`,
-   re-render open form cards.
+2. ~~**`SecureChat.prototype.setProfile(profile)`** in core~~ Done. Stores the
+   profile and drops any unsubmitted form card from the cache so it rebuilds.
+   Submitted cards are receipts and are left alone. Nothing carries consent
+   across — see task 4.
 
 3. **`identity` field type** in `fieldEl()`. With a non-guest profile, render a
    confirm row — "We'll use: {name} · {phone} · {email}" — with a Change link
@@ -160,8 +162,12 @@ system answers the substantive part of any patient request.
 4. **Never prefill consent or the assessment signature.** Each submission needs
    its own consent record with its own timestamp. Not an optimisation for later.
 
-5. **Wire `AuthGate`** in `secure-chat.demo.js` against a stub `auth` matching
-   the contract in `secure-chat.auth.js`. Guest mode shows no transcript.
+5. ~~**Wire `AuthGate`** in `secure-chat.demo.js`~~ Done, against a stub `auth`
+   implementing all nine contract methods. Verified in Chromium: sign-in →
+   code → wrong code errors → link → chat, and guest hides the transcript.
+   The stub resolves everything in the browser and verifies nothing, so it
+   demonstrates the screens and nothing about auth. The six rules in the
+   `secure-chat.auth.js` footer are all still outstanding server work.
 
 6. **Server side** under `api/` — extend what's there, match its conventions.
    Auth contract endpoints plus `POST /api/chat/send`, `GET /api/chat/stream`

@@ -83,6 +83,56 @@ const chat = new SecureChat(document.getElementById('chat'), {
   onCall: () => console.log('[SecureChat] call [Phone Number]')
 });
 
+/* ── Auth gate ─────────────────────────────────────────────────────────
+   A stub `auth` matching the contract at the bottom of secure-chat.auth.js.
+
+   Every call resolves in the browser. Nothing is verified, no token is
+   checked, no session survives a reload, and any six digits are accepted.
+   This exercises the screens — it demonstrates nothing about auth. The six
+   numbered rules in that file's footer are all server-side work.
+   ─────────────────────────────────────────────────────────────────── */
+
+const wait = (ms, value) => new Promise(r => setTimeout(() => r(value), ms));
+
+const demoPatient = {
+  id: 'demo-0001',
+  name: 'Maya Halloran',
+  email: 'maya@example.com',
+  phone: '+1 555 0100',
+  dob: '1988-04-12',
+  healthCard: '1234-567-890-AB',
+  hasPasskey: false,
+  guest: false
+};
+
+const demoAuth = {
+  // null so every reload lands on sign-in — that's the screen under review.
+  // Return { profile } instead to boot straight into the chat.
+  currentSession: () => wait(400, null),
+
+  // Google proves control of an address, not that the person is this patient,
+  // so both it and a verified code route to the link screen.
+  googleSignIn: () => wait(700, { needsLink: true }),
+  requestCode: ({ to }) => { console.log('[auth] code sent to', to); return wait(700, { ok: true }); },
+  verifyCode: ({ code }) => code === '000000'
+    ? Promise.reject(new Error('rejected code, for testing the error path'))
+    : wait(700, { needsLink: true }),
+
+  linkPatient: ({ healthCard, dob }) => wait(900, { profile: { ...demoPatient, healthCard, dob } }),
+
+  passkeyRegister: () => wait(600, { ok: true }),
+  passkeyAuth: () => wait(600, { profile: { ...demoPatient, hasPasskey: true } }),
+  signOut: () => wait(300, { ok: true })
+};
+
+new AuthGate(document.getElementById('chat'), {
+  auth: demoAuth,
+  chat,
+  pharmacyName: 'Old Park Pharmacy',
+  country: 'Canada',
+  onSession: profile => console.log('[auth] session', profile)
+});
+
 /* ── Going live ───────────────────────────────────────────────────────
    Swap `demoTransport` for the real one. Nothing else changes.
 
