@@ -60,11 +60,20 @@ Every record is keyed by `pharmacy_id`. One deployment serves all Medixly pharma
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — flow, modules, data model
 - [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md) — PHIPA/PIPEDA controls checklist
 - [`docs/CLASSIFIER.md`](docs/CLASSIFIER.md) — system prompt and output contract
+- [`docs/PIA.md`](docs/PIA.md) — privacy impact assessment (draft, pre-pilot)
+- [`docs/privacy-documents.md`](docs/privacy-documents.md) — the four documents PHIPA requires of a custodian
+- [`docs/VOICE.md`](docs/VOICE.md) — voice transfer flow
+- [`web/HANDOFF.md`](web/HANDOFF.md) — secure chat client: file map, design rules, tasks
 - [`ROADMAP.md`](ROADMAP.md) — build phases
 
 ## Status
 
-Pre-build. Architecture approved. Classifier and test set written, not yet run.
+Pre-pilot, and not approved for real patient data — see [`docs/PIA.md`](docs/PIA.md) §10.
+
+Written but not yet run end to end: the classifier and its test set, the
+submission endpoint and database schema, the staff queue page, and the patient
+secure chat client. Nothing has been deployed to Canadian infrastructure, which
+Phase 5 requires before the first real patient.
 
 ---
 

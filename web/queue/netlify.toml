@@ -1,0 +1,14 @@
+# Staff queue — a separate Netlify site from the patient one.
+#
+# For this to be read, set that site's base directory to `web/queue`. Netlify
+# then loads this file instead of the root netlify.toml, and `publish = "."`
+# resolves to this directory.
+#
+# This site must never be public: it lists patient submissions. Set visitor
+# access to private, and confirm your Netlify plan actually enforces it —
+# password protection is a paid feature, and on a free plan this deploys
+# publicly to anyone with the URL. The staff key in the page is not access
+# control; it runs in the browser.
+
+[build]
+  publish = "."

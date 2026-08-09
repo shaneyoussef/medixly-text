@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Secure chat — Old Park Pharmacy</title>
+
+<!--
+  Medixly · Patient secure chat — shell
+  ────────────────────────────────────
+  Markup only. Styling and behaviour live in the files loaded below; the
+  file map and the reasons behind the split are in web/HANDOFF.md.
+
+  `ds-tokens.css` is a standalone copy of the Medixly design tokens so this
+  page opens on its own. In the real app, drop it and link the design
+  system instead:
+
+    <link rel="stylesheet" href="_ds/medixly-design-system-.../styles.css">
+
+  Every value comes from a design-system token — no raw hex, no off-scale
+  sizes. Wiring instructions are at the bottom of secure-chat.demo.js.
+
+  Script order matters: core → forms → auth → print → demo. Nothing is
+  referenced at evaluation time across files, but `demo` constructs
+  everything, so it goes last.
+
+  The sign-in gate is not in this markup — `AuthGate` builds it and appends
+  it to `.mx-chat` itself.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<link rel="stylesheet" href="ds-tokens.css">
+<link rel="stylesheet" href="secure-chat.css">
+<link rel="stylesheet" href="secure-chat.auth.css">
+</head>
+<body>
+<div class="mx-chat" id="chat">
+
+  <header class="mx-header">
+    <button type="button" class="mx-iconbtn" data-back aria-label="Back">
+      <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/chevron-left.svg)"></i>
+    </button>
+    <div class="mx-avatar" data-avatar aria-hidden="true">OP</div>
+    <div class="mx-identity">
+      <div class="mx-name" data-name>Old Park Pharmacy</div>
+      <div class="mx-presence">
+        <span class="mx-dot" data-presence-dot></span>
+        <span data-presence>Pharmacist on duty · replies within 2 hours</span>
+      </div>
+    </div>
+    <button type="button" class="mx-iconbtn mx-iconbtn--outline" data-call aria-label="Call the pharmacy">
+      <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/phone.svg)"></i>
+    </button>
+  </header>
+
+  <div class="mx-body">
+    <div class="mx-log" data-log role="log" aria-live="off" aria-label="Conversation with Old Park Pharmacy">
+      <div class="mx-notice">
+        <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/lock.svg)"></i>
+        <p>This conversation is encrypted end to end. Don't send emergency requests here — call us or dial 911.</p>
+      </div>
+      <div data-stream></div>
+    </div>
+    <button type="button" class="mx-jump" data-jump hidden>
+      <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/arrow-down.svg)"></i>
+      Latest messages
+    </button>
+  </div>
+
+  <!-- Service rail. Filled from SERVICES in secure-chat.forms.js. -->
+  <div class="mx-quick" data-quick role="group" aria-label="Common requests"></div>
+
+  <div class="mx-composer">
+    <p class="mx-alert" data-error hidden></p>
+    <div class="mx-chips" data-chips></div>
+
+    <div class="mx-row" data-row>
+      <button type="button" class="mx-attach" data-attach aria-label="Attach a photo or a file"
+              aria-haspopup="dialog" aria-expanded="false">
+        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/upload.svg)"></i>
+      </button>
+
+      <!-- Three pickers, so the sheet can offer the camera separately from the library. -->
+      <input type="file" data-camera hidden accept="image/*" capture="environment">
+      <input type="file" data-photos hidden multiple accept="image/*">
+      <input type="file" data-docs hidden multiple accept="application/pdf,image/*">
+
+      <textarea class="mx-input" data-input rows="1" placeholder="Write a message" aria-label="Write a message"></textarea>
+
+      <button type="button" class="mx-send mx-mic" data-mic aria-label="Record a voice note" hidden>
+        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/mic.svg)"></i>
+      </button>
+      <button type="button" class="mx-send" data-send aria-label="Send" disabled>
+        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/arrow-up.svg)"></i>
+      </button>
+    </div>
+
+    <!-- Replaces the row while recording. -->
+    <div class="mx-rec" data-rec hidden>
+      <span class="mx-rec__dot" aria-hidden="true"></span>
+      <span class="mx-timer" data-timer>0:00</span>
+      <div class="mx-bars" data-levels aria-hidden="true"></div>
+      <button type="button" class="mx-iconbtn" data-rec-cancel aria-label="Discard recording">
+        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/trash-2.svg)"></i>
+      </button>
+      <button type="button" class="mx-send" data-rec-stop aria-label="Stop recording">
+        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/check.svg)"></i>
+      </button>
+    </div>
+
+    <p class="mx-trust">
+      <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/lock.svg)"></i>
+      <span data-trust>Your information is transmitted securely via Hushmail for Healthcare — PIPEDA compliant</span>
+    </p>
+  </div>
+
+  <!-- Attach sheet -->
+  <div class="mx-scrim" data-scrim hidden>
+    <div class="mx-sheet" data-sheet role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <h2 id="sheet-title">Attach something</h2>
+      <p>Photos and PDFs, up to 5 files at 10 MB each.</p>
+
+      <button type="button" class="mx-option" data-pick="camera">
+        <span class="mx-disc mx-disc--ink">
+          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/camera.svg)"></i>
+        </span>
+        Take a photo
+      </button>
+      <button type="button" class="mx-option" data-pick="photos">
+        <span class="mx-disc mx-disc--teal">
+          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/image.svg)"></i>
+        </span>
+        Photo library
+      </button>
+      <button type="button" class="mx-option" data-pick="docs">
+        <span class="mx-disc mx-disc--clay">
+          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/file-text.svg)"></i>
+        </span>
+        Choose a file
+      </button>
+
+      <button type="button" class="mx-cancel" data-sheet-cancel>Cancel</button>
+    </div>
+  </div>
+
+  <!-- Image viewer -->
+  <div class="mx-viewer" data-viewer hidden>
+    <img data-viewer-img alt="Attachment">
+    <button type="button" class="mx-iconbtn" data-viewer-close aria-label="Close">
+      <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/x.svg)"></i>
+    </button>
+  </div>
+
+  <p class="mx-sr" data-announce role="status" aria-live="polite"></p>
+</div>
+
+<script src="secure-chat.core.js"></script>
+<script src="secure-chat.forms.js"></script>
+<script src="secure-chat.auth.js"></script>
+<script src="secure-chat.print.js"></script>
+<script src="secure-chat.demo.js"></script>
+</body>
+</html>

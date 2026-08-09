@@ -8,20 +8,26 @@ missing, and what to build next.
 
 ## What exists
 
-All files live in `web/`. They were previously one 106KB `secure-chat.html`;
-the split version replaces it in place.
+All files live in `web/form/`, which is the patient site's Netlify publish
+directory — so the chat is served at that site's root. They were previously one
+106KB `secure-chat.html`; the split version replaces it in place.
 
-| File | What's in it |
-| --- | --- |
-| `secure-chat.html` | Shell. Markup only, loads everything below. |
-| `ds-tokens.css` | Copy of the Medixly design tokens so the page opens standalone. In the app, drop it and link the real design system. |
-| `secure-chat.css` | All chat styling. |
-| `secure-chat.auth.css` | Sign-in gate styling. |
-| `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. |
-| `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. |
-| `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. |
-| `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. |
-| `secure-chat.demo.js` | Stub transport and boot. Replace to go live. |
+**Two files have not landed yet**, and both are currently stood up by a
+placeholder so the page loads on a deploy preview. With the placeholder in
+place there is no service rail, no form card and no consent block: **the page
+cannot submit anything.** Replace both files wholesale; don't merge into them.
+
+| File | What's in it | Landed |
+| --- | --- | --- |
+| `index.html` | Shell. Markup only, loads everything below. | yes |
+| `ds-tokens.css` | Copy of the Medixly design tokens so the page opens standalone. In the app, drop it and link the real design system. | yes |
+| `secure-chat.css` | All chat styling. | yes |
+| `secure-chat.auth.css` | Sign-in gate styling. | yes |
+| `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
+| `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | **placeholder** |
+| `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
+| `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
+| `secure-chat.demo.js` | Stub transport and boot. Replace to go live. | yes |
 
 ### Features built
 
@@ -30,6 +36,9 @@ photo library or file, with client-side downscaling to 2048px. Voice notes with
 waveform capture and playback. A horizontally scrolling service rail. Five
 paginated form cards — transfer, refill, upload, vaccine booking, minor ailment
 assessment — each 3–6 short pages ending in review, consent, submit.
+
+The service rail and the five form cards are rendered by `core` but defined in
+`forms`, so neither appears until that file lands.
 
 ### Load order matters
 
@@ -130,10 +139,18 @@ system answers the substantive part of any patient request.
 
 ## Tasks
 
-1. **Confirm the split page loads.** It replaces the old monolith in place.
+1. **Confirm the split page loads.** The shell has replaced the old monolith in
+   place and was checked in Chromium against the real `core`, `auth` and `demo`
+   files, with throwaway stubs standing in for the two that hadn't landed:
+   history renders with day dividers, the composer flips mic to send, the attach
+   sheet traps focus and closes on Escape, and a sent message runs sending →
+   delivered → read. Re-run this against the real `forms` and `print` once they
+   land — that is the check that counts.
 
-2. **`SecureChat.prototype.setProfile(profile)`** in core — store `this.profile`,
-   re-render open form cards.
+2. ~~**`SecureChat.prototype.setProfile(profile)`** in core~~ Done. Stores the
+   profile and drops any unsubmitted form card from the cache so it rebuilds.
+   Submitted cards are receipts and are left alone. Nothing carries consent
+   across — see task 4.
 
 3. **`identity` field type** in `fieldEl()`. With a non-guest profile, render a
    confirm row — "We'll use: {name} · {phone} · {email}" — with a Change link
@@ -145,8 +162,12 @@ system answers the substantive part of any patient request.
 4. **Never prefill consent or the assessment signature.** Each submission needs
    its own consent record with its own timestamp. Not an optimisation for later.
 
-5. **Wire `AuthGate`** in `secure-chat.demo.js` against a stub `auth` matching
-   the contract in `secure-chat.auth.js`. Guest mode shows no transcript.
+5. ~~**Wire `AuthGate`** in `secure-chat.demo.js`~~ Done, against a stub `auth`
+   implementing all nine contract methods. Verified in Chromium: sign-in →
+   code → wrong code errors → link → chat, and guest hides the transcript.
+   The stub resolves everything in the browser and verifies nothing, so it
+   demonstrates the screens and nothing about auth. The six rules in the
+   `secure-chat.auth.js` footer are all still outstanding server work.
 
 6. **Server side** under `api/` — extend what's there, match its conventions.
    Auth contract endpoints plus `POST /api/chat/send`, `GET /api/chat/stream`
@@ -169,10 +190,10 @@ system answers the substantive part of any patient request.
 10. **Barcode of the submission ID** on the print sheet (Code 128), so sheets
     scan into the pharmacy system without typing.
 
-11. **Netlify publish directories.** `web/README.md` documents `web/form/` as a
-    publish directory that doesn't exist, and `secure-chat.html` sits outside
-    both publish directories — so it isn't deployed. Fix in its own PR, separate
-    from this work.
+11. ~~**Netlify publish directories.**~~ Done. `web/form/` now exists and holds
+    the whole chat client, with the shell renamed `index.html` so it serves at
+    the site root. Publishing `web/` itself was never an option — it would have
+    put the staff queue on the public site.
 
 ---
 
