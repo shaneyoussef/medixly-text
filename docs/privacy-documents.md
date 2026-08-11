@@ -222,10 +222,23 @@ delete records we are legally required to keep.
 
 ### Who can see it
 
-Only pharmacy staff who need it to do their work. We use service providers to
-operate our systems — our database and files are stored in **Canada**; our email
-notification provider is located in the United States and receives only your
-first name and a reference number, never your health information.
+Only pharmacy staff who need it to do their work. We also use service providers
+to operate our systems, and you should know where they are:
+
+- Your request records and any files you send us are stored in **Canada**.
+- Our email notification provider is in the **United States** and receives only
+  your first name and a reference number, never your health information.
+- If you buy an over-the-counter product through us, **Shopify** handles that
+  order and the payment. They receive your name, contact and delivery details and
+  what you bought. They never receive a reason for the purchase, and we never send
+  them anything about your health.
+- When you send us a message, the text is read by an automated service that works
+  out what you are asking for, so we can send you to the right form or to a
+  pharmacist. `[CONFIRM WITH PRIVACY OFFICER — where this runs, and whether it
+  needs its own consent.]`
+
+We never pay for your information to be used for advertising, and we do not put
+advertising or analytics trackers on the page where you message us.
 
 ### How we protect it
 
@@ -277,3 +290,8 @@ health privacy. The specific questions worth paying for:
 2. Is a transfer request from someone who never became a patient a patient
    record for retention purposes?
 3. Does the marketing approach comply with the College's advertising standards?
+4. Is the record of a patient buying a specific health product from us personal
+   health information, given the reasoning in the PIA at §3? It decides whether
+   Shopify is a service provider holding PHI.
+5. Does automated classification of a patient's message need its own consent, or
+   is it covered by consent to the service itself?

@@ -22,7 +22,7 @@ import {
 } from "./classify.js";
 
 /** The chat client's form card ids, from `secure-chat.forms.js`. */
-export type FormId = "transfer" | "refill" | "upload" | "ailment";
+export type FormId = "transfer" | "refill" | "upload" | "ailment" | "callback";
 
 /** Matches the `request_channel` enum in `db/schema.sql`. */
 export type Channel = "sms" | "web";
@@ -36,6 +36,11 @@ export interface AgentDecision {
   reply: string;
   /** Form card to push into the thread. Web chat only; null on SMS. */
   form: FormId | null;
+  /**
+   * A product search to run, or null. Only ever set for a shopping request the
+   * classifier found no health details in — see the refusal boundary below.
+   */
+  shopQuery: string | null;
   /** Which form the tokenized link should point at. SMS uses this; web ignores it. */
   linkTo: FormId | null;
   /** A person needs to see this now. */
@@ -57,8 +62,10 @@ export interface AgentContext {
   prior?: Intent[];
   /** Voice line, shown when we tell someone to call. Clause is dropped if unset. */
   phone?: string;
-  /** The OTC storefront. Without it, OTC requests go to a human instead. */
+  /** The OTC storefront, for channels with no in-chat shop (SMS). */
   storeUrl?: string;
+  /** True when the surface can show product cards — the web chat can. */
+  shop?: boolean;
   /** Swap the classifier out in tests. */
   classify?: (message: string) => Promise<Classification>;
 }
@@ -116,7 +123,27 @@ const FORM_FOR: Partial<Record<Intent, FormId>> = {
   REFILL: "refill",
   RX_UPLOAD: "upload",
   MINOR_AILMENT: "ailment",
+  PHARMACIST_CHAT: "callback",
 };
+
+/* ── The refusal boundary ──────────────────────────────────────────────
+   An agent that answers "what should I take for my UTI" with a product is
+   giving clinical advice. It must not, ever — that judgment belongs to a
+   pharmacist, and this is the line that keeps a shop inside a pharmacy
+   lawful rather than merely convenient.
+
+   The boundary is drawn on a signal the classifier already computes:
+   `contains_health_details`. A shopping request with no health details in
+   it ("do you have Claritin", "nasal strips") is a product lookup, and
+   safe. A shopping request that mentions a symptom ("something for my
+   itchy eyes") is a clinical question wearing a shopping hat, and gets a
+   pharmacist instead of a shelf.
+
+   Note what this makes load-bearing. `docs/CLASSIFIER.md` describes PHI
+   detection as driving shortened retention; it now also draws a clinical
+   safety line, so a miss on that flag is no longer only a privacy problem.
+   The separate PHI-detection score in `test/run.ts` is the number to watch.
+   ─────────────────────────────────────────────────────────────────── */
 
 /* ── Reply copy ───────────────────────────────────────────────────────
    Templates, not generated text. A reply is a function of the *intent*, never
@@ -150,10 +177,18 @@ const REPLY: Record<Exclude<Intent, "UNCLEAR">, Record<Channel, string>> = {
     sms: "This one’s for a pharmacist. I’ve flagged it and they’ll get back to you.",
   },
   OTC_ORDER: {
-    web: "You can browse and order those here:",
+    web: "Here’s what we have on the shelf. A pharmacist checks every order before it goes out.",
     sms: "You can browse and order those here:",
   },
 };
+
+/**
+ * A shopping message that mentions a symptom. Not refused — redirected, because
+ * the patient asked a reasonable question and deserves a better answer than a
+ * product listing.
+ */
+const OTC_CLINICAL =
+  "I’d rather a pharmacist answered that than have me point you at a shelf. Tell them what’s going on and they’ll say what will actually help.";
 
 /** Second UNCLEAR in a row: stop asking and get a person. */
 const HANDOFF =
@@ -202,6 +237,7 @@ export async function respond(
     containsHealthDetails: false,
     form: null,
     linkTo: null,
+    shopQuery: null,
     emergency: false,
     degraded: false,
   } as const;
@@ -235,7 +271,9 @@ export async function respond(
   try {
     found = await run(text);
   } catch (err) {
-    console.error("[agent] classification failed", err);
+    // The message itself is never logged, only what went wrong reaching the
+    // classifier.
+    console.error("[agent] classification failed:", (err as Error)?.message);
     return {
       ...base,
       intent: "UNCLEAR",
@@ -248,6 +286,7 @@ export async function respond(
   const shared = {
     confidence: found.confidence,
     containsHealthDetails: found.contains_health_details,
+    shopQuery: null,
     emergency: false,
     degraded: false,
   };
@@ -281,22 +320,57 @@ export async function respond(
     };
   }
 
-  // 5. OTC without a storefront configured goes to a person rather than to a
-  //    reply with a hole in it.
-  if (found.intent === "OTC_ORDER" && !ctx.storeUrl) {
+  // 5. Shopping. The refusal boundary above decides which of three ways this
+  //    goes, and the order matters: clinical first, then whether we can sell.
+  if (found.intent === "OTC_ORDER") {
+    // A symptom in a shopping message is a clinical question. No shelf.
+    if (found.contains_health_details) {
+      return {
+        ...shared,
+        intent: "OTC_ORDER",
+        reply: OTC_CLINICAL,
+        form: channel === "web" ? "callback" : null,
+        linkTo: "callback",
+        escalate: true,
+      };
+    }
+
+    // In-chat shop, on web: search the shelf.
+    if (channel === "web" && ctx.shop) {
+      return {
+        ...shared,
+        intent: "OTC_ORDER",
+        reply: REPLY.OTC_ORDER.web,
+        form: null,
+        linkTo: null,
+        shopQuery: text,
+        escalate: false,
+      };
+    }
+
+    // SMS, or web with no shop wired: a link if there is one, a person if not.
+    if (!ctx.storeUrl) {
+      return {
+        ...shared,
+        intent: "OTC_ORDER",
+        reply: OTC_NO_STORE,
+        form: null,
+        linkTo: null,
+        escalate: true,
+      };
+    }
     return {
       ...shared,
       intent: "OTC_ORDER",
-      reply: OTC_NO_STORE,
+      reply: `${REPLY.OTC_ORDER[channel]} ${ctx.storeUrl}`,
       form: null,
       linkTo: null,
-      escalate: true,
+      escalate: false,
     };
   }
 
   const form = FORM_FOR[found.intent] ?? null;
   let reply = REPLY[found.intent][channel];
-  if (found.intent === "OTC_ORDER") reply = `${reply} ${ctx.storeUrl}`;
   if (found.intent === "PHARMACIST_CHAT") reply += urgentCall(ctx.phone);
 
   return {

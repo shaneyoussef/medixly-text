@@ -102,7 +102,10 @@ export async function classify(
   });
 
   if (!res.ok) {
-    throw new Error(`Anthropic API ${res.status}: ${await res.text()}`);
+    // Status only. An error body can echo the request back, and this text is a
+    // patient's message — the audit design keeps message text out of stored
+    // records, so it must not arrive in a log through the back door instead.
+    throw new Error(`Anthropic API ${res.status}`);
   }
 
   const data = await res.json();

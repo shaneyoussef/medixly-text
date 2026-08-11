@@ -34,6 +34,15 @@ const COUNTRY = {
   USA:    { platform: 'Paubox', law: 'HIPAA' }
 };
 
+/* ── Shop ──────────────────────────────────────────────────────────── */
+// Matches MAX_QTY in api/shop.ts, which rejects anything above it.
+const MAX_QTY = 12;
+
+/** Money for display. Shopify returns amounts as decimal strings. */
+const money = (amount, currency = 'CAD') =>
+  new Intl.NumberFormat(undefined, { style: 'currency', currency })
+    .format(typeof amount === 'string' ? parseFloat(amount) : amount);
+
 /**
  * Ten digits, which is what `requests.patient_phone` stores. A leading country
  * code is dropped rather than rejected — people write their own number as
@@ -546,6 +555,8 @@ class SecureChat {
 
   messageEl(m) {
     if (m.kind === 'form') return this.formEl(m);
+    if (m.kind === 'products') return this.productsEl(m);
+    if (m.kind === 'basket') return this.basketEl(m);
 
     const wrap = el('div', `mx-msg mx-msg--${m.from === 'me' ? 'me' : 'them'}`);
     if (!this.seen.has(m.id)) { wrap.classList.add('mx-enter'); this.seen.add(m.id); }
@@ -699,6 +710,8 @@ class SecureChat {
       chip.append(icon(s.icon, true), document.createTextNode(s.label));
       chip.addEventListener('click', () => {
         if (s.form) return this.requestForm(s.form);
+        // Browsing the shelf sends no message and involves no model.
+        if (s.shop) return this.opts.shop?.search(s.query || '');
         const input = this.$('input');
         input.value = s.prefill;
         input.focus();
@@ -706,6 +719,228 @@ class SecureChat {
       });
       return chip;
     }));
+  }
+
+  /* ── Shop ────────────────────────────────────────────────────────
+     Products and a basket, rendered as cards in the thread. Everything
+     here is display and local basket state; the network lives in
+     `opts.shop` (secure-chat.shop.js).
+
+     Neither card is cached. Unlike a form card there is nothing typed to
+     lose, and the basket card has to redraw whenever the basket changes,
+     so rebuilding on every render is both simpler and correct.
+
+     What must never appear on these cards: why the patient wants the
+     product. The basket carries variant ids and quantities, and that is
+     what reaches Shopify. See docs/SHOP.md.
+     ─────────────────────────────────────────────────────────────── */
+
+  /** Drops a set of search results into the thread. */
+  showProducts(query, products) {
+    this.messages.push({
+      id: uid(), kind: 'products', from: 'them', ts: Date.now(),
+      query, products: products || []
+    });
+    this.stick = true;
+    this.render();
+  }
+
+  /** variantId → { product, qty }. Insertion-ordered, which is display order. */
+  get basket() {
+    this._basket = this._basket || new Map();
+    return this._basket;
+  }
+
+  basketCount() {
+    let n = 0;
+    for (const line of this.basket.values()) n += line.qty;
+    return n;
+  }
+
+  basketTotal() {
+    let cents = 0;
+    for (const { product, qty } of this.basket.values()) {
+      cents += Math.round(parseFloat(product.price) * 100) * qty;
+    }
+    return cents / 100;
+  }
+
+  addToBasket(product) {
+    const line = this.basket.get(product.variantId);
+    if (line) line.qty = Math.min(line.qty + 1, MAX_QTY);
+    else this.basket.set(product.variantId, { product, qty: 1 });
+    this.announceBasket(`${product.title} added.`);
+    this.showBasket();
+  }
+
+  setQty(variantId, qty) {
+    if (qty <= 0) this.basket.delete(variantId);
+    else {
+      const line = this.basket.get(variantId);
+      if (line) line.qty = Math.min(qty, MAX_QTY);
+    }
+    this.announceBasket();
+    this.render();
+  }
+
+  clearBasket() { this.basket.clear(); this.render(); }
+
+  announceBasket(prefix = '') {
+    const n = this.basketCount();
+    this.$('announce').textContent =
+      `${prefix} Basket: ${n} ${n === 1 ? 'item' : 'items'}, ${money(this.basketTotal())}.`.trim();
+  }
+
+  /** Shows the basket card, moving the existing one rather than stacking. */
+  showBasket() {
+    const open = this.messages.find(m => m.kind === 'basket');
+    if (open) {
+      // Keep it as the newest thing in the thread so it's where they look.
+      this.messages.splice(this.messages.indexOf(open), 1);
+      open.ts = Date.now();
+      this.messages.push(open);
+    } else {
+      this.messages.push({ id: uid(), kind: 'basket', from: 'them', ts: Date.now() });
+    }
+    this.stick = true;
+    this.render();
+  }
+
+  productsEl(m) {
+    const wrap = el('div', 'mx-msg mx-msg--form');
+    if (!this.seen.has(m.id)) { wrap.classList.add('mx-enter'); this.seen.add(m.id); }
+    const card = el('div', 'mx-shop');
+    wrap.append(card);
+
+    card.append(el('h3', null, m.query ? `Matches for “${m.query}”` : 'Available to order'));
+
+    if (!m.products.length) {
+      card.append(el('p', 'mx-shop__blurb',
+        'We don’t have that on the shelf for online orders. A pharmacist can check the back or suggest what we do carry.'));
+      return wrap;
+    }
+
+    card.append(el('p', 'mx-shop__blurb',
+      'Prices include what you’d pay at the counter. A pharmacist checks every order before it goes out.'));
+    m.products.forEach(p => card.append(this.productEl(p)));
+    return wrap;
+  }
+
+  productEl(p) {
+    const row = el('div', 'mx-prod');
+
+    const thumb = el('div', 'mx-prod__img');
+    if (p.image) {
+      const img = el('img');
+      img.src = p.image;
+      img.alt = p.imageAlt || p.title;
+      img.loading = 'lazy';
+      thumb.append(img);
+    } else {
+      thumb.append(icon('package'));
+    }
+
+    const body = el('div', 'mx-prod__body');
+    body.append(el('span', 'mx-prod__name', p.title));
+    const meta = el('div', 'mx-prod__meta');
+    meta.append(el('span', 'mx-price', money(p.price, p.currency)));
+    if (p.vendor) meta.append(el('span', 'mx-vendor', p.vendor));
+    body.append(meta);
+
+    row.append(thumb, body);
+
+    if (p.available === false) {
+      row.append(el('span', 'mx-oos', 'Out of stock'));
+      return row;
+    }
+
+    const add = el('button', 'mx-add');
+    add.type = 'button';
+    add.setAttribute('aria-label', `Add ${p.title} to your basket`);
+    add.append(icon('plus'));
+    add.addEventListener('click', () => this.addToBasket(p));
+    row.append(add);
+    return row;
+  }
+
+  basketEl(m) {
+    const wrap = el('div', 'mx-msg mx-msg--form');
+    if (!this.seen.has(m.id)) { wrap.classList.add('mx-enter'); this.seen.add(m.id); }
+    const card = el('div', 'mx-shop');
+    wrap.append(card);
+
+    card.append(el('h3', null, 'Your basket'));
+
+    if (!this.basket.size) {
+      card.append(el('p', 'mx-empty', 'Nothing in it yet.'));
+      return wrap;
+    }
+
+    for (const [variantId, line] of this.basket) {
+      const row = el('div', 'mx-prod');
+
+      const thumb = el('div', 'mx-prod__img');
+      if (line.product.image) {
+        const img = el('img');
+        img.src = line.product.image;
+        img.alt = line.product.imageAlt || line.product.title;
+        thumb.append(img);
+      } else {
+        thumb.append(icon('package'));
+      }
+
+      const body = el('div', 'mx-prod__body');
+      body.append(el('span', 'mx-prod__name', line.product.title));
+      const meta = el('div', 'mx-prod__meta');
+      meta.append(el('span', 'mx-price',
+        money(parseFloat(line.product.price) * line.qty, line.product.currency)));
+      body.append(meta);
+
+      const qty = el('div', 'mx-qty');
+      const less = el('button');
+      less.type = 'button';
+      less.setAttribute('aria-label', `One fewer ${line.product.title}`);
+      less.append(icon('minus', true));
+      less.addEventListener('click', () => this.setQty(variantId, line.qty - 1));
+      const count = el('span', null, String(line.qty));
+      count.setAttribute('aria-label', `Quantity ${line.qty}`);
+      const more = el('button');
+      more.type = 'button';
+      more.setAttribute('aria-label', `One more ${line.product.title}`);
+      more.append(icon('plus', true));
+      more.disabled = line.qty >= MAX_QTY;
+      more.addEventListener('click', () => this.setQty(variantId, line.qty + 1));
+      qty.append(less, count, more);
+
+      row.append(thumb, body, qty);
+      card.append(row);
+    }
+
+    const total = el('div', 'mx-total');
+    total.append(el('span', null, 'Subtotal'),
+                 el('span', 'mx-price', money(this.basketTotal())));
+    card.append(total);
+    card.append(el('p', 'mx-hint', 'Tax and any delivery charge are added at checkout.'));
+
+    const pay = el('button', 'mx-submit', 'Checkout');
+    pay.type = 'button';
+    pay.addEventListener('click', async () => {
+      pay.disabled = true;
+      pay.textContent = 'Opening checkout…';
+      try {
+        await this.opts.shop?.checkout(
+          [...this.basket.values()].map(l => ({ variantId: l.product.variantId, quantity: l.qty }))
+        );
+      } catch (err) {
+        console.error('[SecureChat] checkout failed', err);
+        this.fail('We couldn’t open checkout. Check your connection and try again.');
+      } finally {
+        pay.disabled = false;
+        pay.textContent = 'Checkout';
+      }
+    });
+    card.append(pay);
+    return wrap;
   }
 
   /* ── Forms ───────────────────────────────────────────────────── */

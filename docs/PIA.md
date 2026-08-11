@@ -15,9 +15,10 @@ request is stored and appears in a queue the pharmacy works from.
 
 Six request types are in scope: prescription transfer, refill, new prescription
 upload, minor ailment assessment, pharmacist callback, and over-the-counter
-order. **Five are implemented** — everything but the over-the-counter order,
-which has no storefront to point at. This assessment covers the implemented
-system.
+order. **All six are implemented.** Five are forms that land in the pharmacy's
+queue; the over-the-counter order is a Shopify basket and checkout inside the
+chat, which is a different shape and is assessed separately at §8 and in
+docs/SHOP.md. This assessment covers the implemented system.
 
 Version 0.1 of this document was written when only transfer existed and says so
 in places; §4 has been brought up to date and §3, §9 and §12 have not. The
@@ -159,10 +160,29 @@ Pharmacy staff
    |  HTTPS + staff key
    v
 Edge function `queue`  --> requests table
+
+Over-the-counter order (a separate leg, no PHI in it)
+Patient device
+   |  HTTPS
+   v
+Edge function `shop`  --> Shopify Storefront API   (allowlisted collection only)
+   |                          |
+   |                          \--> cart + checkoutUrl
+   v
+Shopify checkout  (Shopify is merchant of record; no card data reaches us)
+   \--> Shopify order: name, contact, delivery address, items
+        NEVER a reason for the purchase
 ```
 
-**Residency:** all PHI is stored and processed in Canada (`ca-central-1`,
-Montréal). Two components sit outside Canada and are addressed in §8.
+The chat page loads no Shopify script. Products arrive as JSON through our own
+proxy and images from Shopify's CDN, so no third-party tag runs in the document
+that holds a patient's conversation. See docs/SHOP.md for why that direction is
+load-bearing rather than incidental.
+
+**Residency:** patient request records are stored and processed in Canada
+(`ca-central-1`, Montréal). Components outside Canada are addressed in §8, and
+two of them now carry more than metadata: the classifier reads message text, and
+Shopify holds over-the-counter order records. Risk 12 in §10 is no longer closed.
 
 ---
 
@@ -219,6 +239,7 @@ agreements with the pharmacy and with subprocessors.
 | Resend | Notification email | US | Patient first name only |
 | Anthropic | Intent classification (not yet in production path) | US | Raw inbound message text when SMS launches |
 | Twilio | SMS and voice (not yet live) | US routing | Message content — hence the no-PHI-in-SMS rule |
+| Shopify | Over-the-counter orders and payment, in-chat | Canadian company, hosted largely outside Canada | Name, contact and delivery address, and which health products were bought. **No clinical context** — no order notes, tags or line attributes naming a condition |
 
 PIPEDA permits cross-border transfer where comparable protection applies and
 the practice is disclosed. Two items need attention:
@@ -271,8 +292,11 @@ rather than a feature.
 | 13 | Assessment and upload forms collect high-sensitivity PHI; this document was written for low-sensitivity transfer data | **High** | Open. §12's rework is due before either form sees a real patient. |
 | 14 | Consent block is a draft derived from the privacy notice, not lawyer-reviewed wording, and names PHIPA while the trust badge names PIPEDA | **High** | Open. Blocks pilot. Privacy officer, then item 8 below. |
 | 15 | Minor ailment red-flag screening questions are not loaded, so the form cannot establish whether a pharmacist may prescribe | **High** | Open. Needs the pharmacy's clinical protocol. Blocks that form. |
+| 16 | Shopify holds order records that may be low-sensitivity PHI, and hosts largely outside Canada — reopening the residency question §5 closed | **High** | Open. Request Shopify's DPA and disclose it in the privacy notice. |
+| 17 | Products that may not lawfully be sold from an unattended cart (NAPRA Schedule II/III) could be exposed in the chat | **High** | Mitigated by an allowlist collection the pharmacist curates — but the collection does not exist yet, so nothing is sellable until they build it. Needs pharmacist sign-off. |
+| 18 | An automated reply could recommend a product for a symptom, which is clinical advice | Medium | Mitigated — a shopping message flagged `contains_health_details` routes to a pharmacist and returns no product. Asserted in `test/agent.ts`. Depends on PHI-detection accuracy; see docs/SHOP.md. |
 | 11 | View bypassing row-level security across pharmacies | — | **Closed** — fixed during this assessment. |
-| 12 | Data residency | — | **Closed** — `ca-central-1`. |
+| 12 | Data residency | **High** | **Reopened.** Request records stay in `ca-central-1`, but the classifier (Anthropic) and the shop (Shopify) both process outside it. See risks 16 and the security section of docs/AGENT.md. |
 
 ---
 

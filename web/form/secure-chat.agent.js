@@ -29,6 +29,7 @@ class MedixlyAgent {
   constructor(opts = {}) {
     this.endpoint = opts.endpoint ?? '/api/chat';
     this.chat = opts.chat ?? null;
+    this.shop = opts.shop ?? null;
     this.route = opts.route ?? null;
     this.thinking = opts.thinking ?? 500;
     this.pace = opts.pace ?? 1400;
@@ -39,7 +40,11 @@ class MedixlyAgent {
     this.prior = [];
   }
 
-  attach(chat) { this.chat = chat; return this; }
+  attach(chat, shop) {
+    this.chat = chat;
+    if (shop) this.shop = shop;
+    return this;
+  }
 
   /** Wraps a base transport so `send` runs through the agent. */
   static transport(base, opts = {}) {
@@ -91,6 +96,13 @@ class MedixlyAgent {
     setTimeout(() => {
       this.chat.receive({ text: decision.reply });
       if (decision.form) this.chat.requestForm(decision.form);
+      // A shop query only ever arrives for a product request the classifier
+      // found no health details in. The refusal boundary is enforced in
+      // api/agent.ts, not here — this end just runs what it's given.
+      if (decision.shopQuery) {
+        this.shop?.search(decision.shopQuery)
+          .catch(err => console.error('[MedixlyAgent] product search failed', err));
+      }
     }, this.thinking + this.pace);
   }
 

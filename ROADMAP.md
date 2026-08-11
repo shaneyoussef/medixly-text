@@ -21,8 +21,8 @@ Missing business registration details is the most common rejection reason.
 - [ ] Test with fake patient data only
 - [ ] Watch a real person use it before building anything else
 
-A pharmacist answers the thread to start with. The routing agent is written and
-parked — see `docs/AGENT.md` for what it would take to switch on.
+A pharmacist answers whatever the agent hands over. The agent itself runs against
+a keyword stub until `POST /api/chat` is deployed — see `docs/AGENT.md`.
 
 This becomes a permanent chat widget on the pharmacy site, not a throwaway rig.
 

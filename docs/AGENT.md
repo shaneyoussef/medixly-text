@@ -1,17 +1,16 @@
 # Agent
 
-> **Parked.** A pharmacist answers the patient thread directly, so
-> `secure-chat.agent.js` is not loaded by `web/form/index.html` and
-> `POST /api/chat` is not deployed. Nothing in the client calls any of it.
+> **Live in the client again, and not deployed.** `secure-chat.agent.js` is
+> loaded, and `POST /api/chat` still is not — the demo runs it against a keyword
+> stub. The agent routes; a pharmacist answers everything it hands over.
 >
-> The code stays because it is tested and self-contained, and because the SMS
-> adapter needs exactly this layer when it arrives — SMS has no service rail to
-> tap, so something has to turn a text message into an intent.
+> It came off the shelf to do one job the service rail can't: turn free text into
+> the right destination, including a product search when someone is shopping and a
+> pharmacist when they are not. See the refusal boundary in docs/SHOP.md.
 >
-> Before switching it back on for web chat, read the security section at the
-> bottom. The short version: the classifier reading a web chat message is a
-> different privacy proposition from it reading an SMS, and three documents would
-> need updating.
+> **The security section at the bottom is now due, not hypothetical.** Region,
+> redaction, session auth and rate limiting all gate deployment. One item is
+> done: message text no longer reaches the logs.
 
 `classify.ts` says what a message *is*. The agent says what to *do* about it.
 
@@ -65,8 +64,9 @@ places, SMS and web chat start drifting apart.
 | `REFILL` | template | `refill` | no |
 | `RX_UPLOAD` | template | `upload` | no |
 | `MINOR_AILMENT` | template | `ailment` | no |
-| `PHARMACIST_CHAT` | template | — | **yes** |
-| `OTC_ORDER` | template + store link | — | only if no store is configured |
+| `PHARMACIST_CHAT` | template | `callback` | **yes** |
+| `OTC_ORDER`, no health details | template | — (product cards instead) | no |
+| `OTC_ORDER`, health details | redirect to a pharmacist | `callback` | **yes** |
 | `UNCLEAR`, first turn | the classifier's clarifying question | — | no |
 | `UNCLEAR`, second in a row | handoff | — | **yes** |
 | emergency tripwire | 911 | — | **yes** |
@@ -152,11 +152,16 @@ health detail.
 classifier nor `api/submit.ts` can route one. Whether vaccines are a seventh
 intent is a decision for the pharmacy; it needs a migration, not a guess here.
 
-**`callback` has no place in the intent → form map.** The client's five forms are
-`transfer`, `refill`, `upload`, `ailment` and `callback`; the agent's map covers
-the first four and treats `PHARMACIST_CHAT` as escalate-with-no-card. Now that a
-callback form exists, `PHARMACIST_CHAT` should probably open it instead. One line
-in `FORM_FOR`, and a test — do it when the agent comes off the shelf.
+~~**`callback` has no place in the intent → form map.**~~ Done —
+`PHARMACIST_CHAT` opens the callback form, and so does a shopping message with a
+symptom in it.
+
+**`shopQuery` is the patient's whole message.** `api/shop.ts` strips filler words
+before matching, which is what makes "do you have any claritin please" find
+Claritin. It is not extraction and there is no model in that path — deliberately,
+because a model that rewrites a shopping query is a model that can invent a
+product name. The cost is that an unusual phrasing may find nothing; the reply
+says so and offers a pharmacist.
 
 **Escalation has nowhere to land.** `escalate: true` reaches the browser and
 stops. The staff queue reads `requests`, and a chat turn isn't one.
@@ -212,10 +217,9 @@ What would make it defensible, in the order that matters:
    ties the message to a person.
 3. **Require a session and rate limit `POST /api/chat`.** It is unauthenticated
    as written, so anyone can post text and spend credits.
-4. **Keep message text out of the logs.** `classify()` throws with the provider's
-   error body in the message (`api/classify.ts`), and `api/agent.ts` logs that
-   error. A 400 body can echo request content, which would put patient text in
-   logs the audit design deliberately keeps text out of. Log the status only.
+4. ~~**Keep message text out of the logs.**~~ Done. `classify()` throws with the
+   status only, and `api/agent.ts` logs a message rather than an error object, so
+   a provider's error body can no longer carry patient text into a log store.
 5. **Get the subprocessor agreement and zero retention in writing**, and disclose
    the flow in the privacy notice.
 

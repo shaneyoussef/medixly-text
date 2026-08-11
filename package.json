@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "test:agent": "tsx test/agent.ts",
+    "test:shop": "tsx test/shop.ts",
     "test:classifier": "tsx test/run.ts"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },

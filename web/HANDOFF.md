@@ -26,11 +26,14 @@ don't merge into it.
 | `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
 | `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | yes |
 | `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
+| `secure-chat.shop.js` | `MedixlyShop`: product search, basket, Shopify checkout. | yes |
+| `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
 | `secure-chat.demo.js` | Stub transport, the submission mapper, boot. Replace the transport to go live; keep the mapper. | yes |
 
-`secure-chat.agent.js` also exists and is **not loaded**. A pharmacist answers
-this thread; see [`../docs/AGENT.md`](../docs/AGENT.md).
+The agent routes and a pharmacist answers whatever it hands over. It never
+suggests a product for a symptom — see [`../docs/AGENT.md`](../docs/AGENT.md)
+and [`../docs/SHOP.md`](../docs/SHOP.md).
 
 ### Features built
 
@@ -43,10 +46,16 @@ consent, submit.
 
 Identity answers arrive prefilled for a signed-in patient. Consent never does.
 
+Over-the-counter ordering: product cards, a basket with a quantity stepper, and
+Shopify checkout inside the page. Products come *into* the chat rather than the
+chat going into the storefront, which keeps every third-party storefront script
+out of the document that holds a health conversation — [`../docs/SHOP.md`](../docs/SHOP.md)
+explains why that direction is load-bearing.
+
 ### Load order matters
 
-`core` → `forms` → `auth` → `print` → `demo`. Nothing is referenced at
-evaluation time across files, but `demo` constructs everything.
+`core` → `forms` → `auth` → `shop` → `agent` → `print` → `demo`. Nothing is
+referenced at evaluation time across files, but `demo` constructs everything.
 
 ### The forms are data, the markup is core's
 
@@ -303,6 +312,16 @@ editing an earlier page leaves a required answer blank on a page you then skip
 past. None of the five forms have cross-step `showWhen` dependencies, and
 `Continue` refuses to advance past a blank required field, so there is no path to
 it today. Keep it — the moment a form gets a conditional page, it matters again.
+
+**No `chat-eligible` collection exists yet.** Nothing is sellable in the chat
+until the pharmacist creates that Shopify collection and puts products in it. The
+proxy logs that it can't find the collection and returns an empty shelf, which is
+the correct failure — never the whole catalogue.
+
+**Guest mode used to hide form cards.** `.is-guest .mx-log .mx-msg` matched every
+bubble, cards included, so a guest could tap a rail chip and see nothing appear.
+Form and shop cards are now exempt. Worth remembering if that selector is ever
+widened again.
 
 **Delivery method casing.** The spec writes "Store Pickup" / "Local Delivery";
 the design system mandates sentence case, so they render as "Store pickup" /

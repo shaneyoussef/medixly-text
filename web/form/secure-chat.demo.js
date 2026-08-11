@@ -1,10 +1,8 @@
 /* ════════════════════════════════════════════════════════════════════
    Demo wiring — replace everything below to go live.
 
-   A pharmacist answers this thread. There is no agent in this page: the
-   rail and the form cards are how a request starts, and a message is just
-   a message waiting for a person. `api/agent.ts` and
-   `secure-chat.agent.js` exist and are not loaded — see docs/AGENT.md.
+   The agent routes and a pharmacist answers whatever it hands over. It
+   never suggests a product for a symptom — see docs/AGENT.md.
    ════════════════════════════════════════════════════════════════════ */
 
 const at = (daysAgo, h, m) => {
@@ -92,6 +90,152 @@ function toSubmission(payload, paths = []) {
   };
 }
 
+/* ── Stub shop ──────────────────────────────────────────
+   Stands in for `/api/shop` on a deploy preview. The products are real —
+   copied from the InstaCare catalogue — so the cards show true titles,
+   CAD prices and CDN images, but the matching here is a local substring
+   pass, not the proxy, and there is no allowlist behind it.
+
+   Two things this therefore proves nothing about: that only curated
+   products are reachable, and that a cart Shopify would accept comes
+   back. Both live in api/shop.ts.
+   ───────────────────────────────────────────────────── */
+
+console.warn(
+  '[SecureChat] the shop is running against a stub, not /api/shop. ' +
+  'No allowlist is enforced and no Shopify cart is created.'
+);
+
+const CDN = 'https://cdn.shopify.com/s/files/1/0958/7798/8645/files/';
+
+const STUB_PRODUCTS = [
+  { variantId: 'gid://shopify/ProductVariant/51931288273189', title: 'Claritin Allergy 24-Hour, 10 Tablets',
+    vendor: 'Claritin', productType: 'Allergy and Sinus', price: '11.49', currency: 'CAD',
+    image: CDN + '056219981142-600x600.jpg?v=1769271765', available: true },
+  { variantId: 'gid://shopify/ProductVariant/51931288338725', title: 'Claritin Allergy 24-Hour, 20 Tablets',
+    vendor: 'Claritin', productType: 'Allergy and Sinus', price: '22.99', currency: 'CAD',
+    image: CDN + '056219981210-600x600.jpg?v=1769271767', available: true },
+  { variantId: 'gid://shopify/ProductVariant/51931287683365', title: 'Allegra Allergies 24-Hour Relief, 12 Tablets',
+    vendor: 'Allegra', productType: 'Allergy and Sinus', price: '14.99', currency: 'CAD',
+    image: CDN + '065914104398-600x600.jpg?v=1769271757', available: true },
+  { variantId: 'gid://shopify/ProductVariant/51931287453989', title: 'health One Loratadine Allergy Remedy 10 mg - 12 Tablets',
+    vendor: 'health One', productType: 'Allergy and Sinus', price: '10.99', currency: 'CAD',
+    image: CDN + '00066000020820_A1C1-600x600.jpg?v=1769271751', available: true },
+  { variantId: 'gid://shopify/ProductVariant/51931287879973', title: 'Breathe Right Nasal Strips, Extra Strength - 8 Strips',
+    vendor: 'Breathe', productType: 'Allergy and Sinus', price: '10.49', currency: 'CAD',
+    image: CDN + 'breathe-right-nasal-strips-extra-strength-tan-600x600.jpg?v=1769271761', available: true },
+  { variantId: 'gid://shopify/ProductVariant/51931287585061', title: 'Aerius Desloratadine Tablets USP 5 mg - 40 Tablets',
+    vendor: 'Aerius', productType: 'Allergy and Sinus', price: '44.99', currency: 'CAD',
+    image: null, available: false }
+];
+
+const stubShop = {
+  async search(query) {
+    await wait(500);
+    // Mirrors the stopword pass in api/shop.ts, without which a whole sentence
+    // like "do you have claritin" matches nothing.
+    const NOISE = new Set(['do','you','have','any','a','an','the','i','im','need',
+      'looking','for','some','please','get','buy','sell','carry','is','it','my',
+      'what','anything','something','hi','hello','order','stock']);
+    const terms = String(query || '').toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+      .filter(t => t && !NOISE.has(t));
+    const products = STUB_PRODUCTS.filter(p => {
+      const hay = `${p.title} ${p.vendor} ${p.productType}`.toLowerCase();
+      return terms.every(t => hay.includes(t));
+    });
+    return { products, total: products.length };
+  },
+  async cart(lines) {
+    await wait(700);
+    console.log('[SecureChat] POST /api/shop/cart', { lines });
+    // A cart permalink is a real Shopify URL and needs no API call, so the
+    // fallback path can be exercised without credentials.
+    const permalink = lines
+      .map(l => `${l.variantId.split('/').pop()}:${l.quantity}`)
+      .join(',');
+    return {
+      id: 'gid://shopify/Cart/stub',
+      checkoutUrl: `https://f1u1zc-8t.myshopify.com/cart/${permalink}`,
+      totalQuantity: lines.reduce((n, l) => n + l.quantity, 0)
+    };
+  }
+};
+
+const shop = new MedixlyShop({ search: q => stubShop.search(q), cart: l => stubShop.cart(l) });
+
+/* ── Stub router ──────────────────────────────────────────
+   Stands in for `POST /api/chat`. Keyword matching, not the classifier,
+   and the reply copy here is placeholder — the real intents, templates,
+   emergency tripwire, two-strikes rule and refusal boundary are all in
+   api/agent.ts.
+
+   It does mirror one thing faithfully, because it is the rule most worth
+   seeing work in a browser: a shopping message with a symptom in it gets
+   a pharmacist, not a shelf.
+   ─────────────────────────────────────────────────────── */
+
+console.warn(
+  '[SecureChat] the agent is running against a keyword stub, not the classifier. ' +
+  'Replies are placeholders. See api/agent.ts for the real routing.'
+);
+
+const STUB_EMERGENCY = /chest pain|can\u2019t breathe|can't breathe|trouble breathing|severe bleeding|suicidal/i;
+
+// Stands in for the classifier's contains_health_details flag, which is what
+// the real boundary keys on.
+const STUB_SYMPTOM = /itchy|itching|rash|sore|pain|ache|sneez|congest|runny|watery|swollen|burning|infection|fever/i;
+
+const STUB_ROUTES = [
+  { intent: 'TRANSFER',        form: 'transfer', re: /transfer|switch(ing)? pharmac|move my (script|prescription)/i },
+  { intent: 'REFILL',          form: 'refill',   re: /refill|running low|more of my|repeat/i },
+  { intent: 'RX_UPLOAD',       form: 'upload',   re: /new prescription|upload|paper (rx|script)|from (my|the) doctor/i },
+  { intent: 'MINOR_AILMENT',   form: 'ailment',  re: /pink eye|cold sore|heartburn|uti|hives|sprain|acne/i },
+  { intent: 'PHARMACIST_CHAT', form: 'callback', re: /pharmacist|interact|side effect|dose|dosing|missed/i }
+];
+
+const STUB_SHOPPING = /claritin|allegra|aerius|loratadine|nasal strip|antihistamine|allergy|buy|order|do you (have|sell|carry)|shop|what (can|should) i take|something for my|recommend/i;
+
+const stubRoute = async (text, prior) => {
+  await wait(600);
+
+  if (STUB_EMERGENCY.test(text)) {
+    return {
+      intent: 'PHARMACIST_CHAT', form: null, shopQuery: null, escalate: true, emergency: true,
+      reply: 'If this is an emergency, call 911 or go to your nearest emergency department now. Don\u2019t wait for a reply here.'
+    };
+  }
+
+  if (STUB_SHOPPING.test(text)) {
+    // The refusal boundary. A symptom turns a shopping request into a
+    // clinical one, and no product is offered.
+    if (STUB_SYMPTOM.test(text)) {
+      return {
+        intent: 'OTC_ORDER', form: 'callback', shopQuery: null, escalate: true,
+        reply: 'I\u2019d rather a pharmacist answered that than have me point you at a shelf. Tell them what\u2019s going on and they\u2019ll say what will actually help.'
+      };
+    }
+    return {
+      intent: 'OTC_ORDER', form: null, shopQuery: text, escalate: false,
+      reply: 'Here\u2019s what we have on the shelf. A pharmacist checks every order before it goes out.'
+    };
+  }
+
+  const hit = STUB_ROUTES.find(r => r.re.test(text));
+  if (!hit) {
+    return prior.at(-1) === 'UNCLEAR'
+      ? { intent: 'UNCLEAR', form: null, shopQuery: null, escalate: true,
+          reply: 'I\u2019m not sure I\u2019ve got this right, so I\u2019ve passed it to the team. Someone will reply here.' }
+      : { intent: 'UNCLEAR', form: null, shopQuery: null, escalate: false,
+          reply: 'Happy to help \u2014 is this about a prescription, a health concern, or something from the shelf?' };
+  }
+
+  return {
+    intent: hit.intent, form: hit.form, shopQuery: null, escalate: !hit.form,
+    reply: '[stub reply] Fill this in and we\u2019ll take it from there.'
+  };
+};
+
 /* ── Transport ─────────────────────────────────────────────────────────
    Faked here. `send` resolves a receipt and a pharmacist answers a while
    later; `submitForm` maps and logs instead of posting.
@@ -147,15 +291,32 @@ const demoTransport = {
   }
 };
 
+// Drop `route` to send messages to the real endpoint instead of the stub.
+// Read receipts mean a person opened the thread, which the agent can't know —
+// faked so the sending \u2192 delivered \u2192 read run is visible on a preview.
+const transport = MedixlyAgent.transport(demoTransport, { route: stubRoute, shop });
+const agentSend = transport.send;
+transport.send = async msg => {
+  const receipt = await agentSend(msg);
+  setTimeout(() => chat.setStatus(msg.id, 'read'), 1200);
+  return receipt;
+};
+
 const chat = new SecureChat(document.getElementById('chat'), {
   pharmacyName: 'Medixly',
   presence: 'Pharmacist on duty · replies within 2 hours',
   country: 'Canada',
   history: seed,
-  transport: demoTransport,
+  transport,
+  shop,
   onBack: () => console.log('[SecureChat] back'),
   onCall: () => console.log('[SecureChat] call [Phone Number]')
 });
+
+// Both answer into the thread, so both need the instance — and the chat
+// needed the transport first.
+shop.attach(chat);
+transport.agent.attach(chat, shop);
 
 /* ── Auth gate ─────────────────────────────────────────────────────────
    A stub `auth` matching the contract at the bottom of secure-chat.auth.js.

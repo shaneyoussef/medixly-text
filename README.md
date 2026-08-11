@@ -6,9 +6,10 @@ A patient texts the pharmacy's number. An AI agent classifies the request and re
 with a secure link to the matching Medixly form. **SMS is the front door only** — all
 protected health information (PHI) is collected on encrypted, Canadian-hosted forms.
 
-A pharmacist answers the patient thread. The routing agent is written and parked
-until the pharmacy wants it — [`docs/AGENT.md`](docs/AGENT.md) covers what it
-does and what switching it on would require.
+The agent routes; it does not converse. It never asks for symptoms, never answers
+a clinical question, and never suggests a product for one — a shopping message
+with a symptom in it gets a pharmacist instead of a shelf. A pharmacist answers
+everything the agent hands over. See [`docs/AGENT.md`](docs/AGENT.md).
 
 ## The rule everything else depends on
 
@@ -26,7 +27,7 @@ lives in the forms and the database; the messaging layer stays clean.
 | `RX_UPLOAD` | Upload prescription form |
 | `MINOR_AILMENT` | Minor ailment assessment |
 | `PHARMACIST_CHAT` | Pharmacist callback request |
-| `OTC_ORDER` | OTC / wellness store |
+| `OTC_ORDER` | In-chat shop, on Shopify |
 | `UNCLEAR` | One clarifying question, then human queue |
 
 `TRANSFER` is the acquisition intent — it is the only one that gains a new patient,
@@ -72,6 +73,7 @@ Treat it as one row, not as multi-tenancy.
 - [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md) — PHIPA/PIPEDA controls checklist
 - [`docs/CLASSIFIER.md`](docs/CLASSIFIER.md) — system prompt and output contract
 - [`docs/AGENT.md`](docs/AGENT.md) — what the system does with a classification
+- [`docs/SHOP.md`](docs/SHOP.md) — in-chat Shopify ordering, and its allowlist
 - [`docs/PIA.md`](docs/PIA.md) — privacy impact assessment (draft, pre-pilot)
 - [`docs/privacy-documents.md`](docs/privacy-documents.md) — the four documents PHIPA requires of a custodian
 - [`docs/VOICE.md`](docs/VOICE.md) — voice transfer flow
@@ -85,6 +87,8 @@ Pre-pilot, and not approved for real patient data — see [`docs/PIA.md`](docs/P
 The patient chat client works in a browser: five forms — transfer, refill,
 prescription upload, minor ailment assessment, pharmacist callback — each
 paginated, validated, and reconciled against the fields `api/submit.ts` stores.
+Plus an in-chat shop: product cards from Shopify, a basket, and checkout without
+leaving the page.
 
 Written but not yet run against a server: the submission endpoint, the classifier
 and its test set, the routing agent, and the staff queue page. Nothing has been

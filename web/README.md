@@ -18,9 +18,14 @@ each mapped to an intent `api/submit.ts` accepts. `secure-chat.print.js` is stil
 a placeholder, so no print or fax sheet can be generated. See
 [`HANDOFF.md`](HANDOFF.md).
 
-A pharmacist answers the thread. There is no agent in the page: the service rail
-and the form cards are how a request starts. `secure-chat.agent.js` exists and is
-not loaded — see [`../docs/AGENT.md`](../docs/AGENT.md).
+Patients can also order over-the-counter products in the thread — product cards,
+a basket, and Shopify checkout without leaving the page. Only products in a
+curated Shopify collection are sellable, and that collection does not exist yet.
+See [`../docs/SHOP.md`](../docs/SHOP.md).
+
+An agent routes free-text messages to the right form, product search, or a
+pharmacist. It never suggests a product for a symptom. A pharmacist answers
+everything it hands over — see [`../docs/AGENT.md`](../docs/AGENT.md).
 
 Two things must change before a real patient: the consent block needs the privacy
 officer's sign-off, and the minor ailment assessment's red-flag questions have to
@@ -44,8 +49,10 @@ Pushing to `main` redeploys both.
 ## Before real patients
 
 - Replace the shared staff key with per-person authentication.
-- Add rate limiting to the `submit` and `chat` endpoints. `chat` spends money on
-  every call.
+- Add rate limiting to the `submit`, `chat` and `shop` endpoints. `chat` spends
+  money on every call.
+- Pharmacist sign-off on the `chat-eligible` collection: some of what a pharmacy
+  stocks cannot lawfully be sold from an unattended cart.
 - Link the privacy notice from the form footer.
 - Give an escalated chat turn somewhere to land. `POST /api/chat` returns
   `escalate` and nothing reads it.

@@ -96,7 +96,7 @@ async function main() {
     ["REFILL", "refill"],
     ["RX_UPLOAD", "upload"],
     ["MINOR_AILMENT", "ailment"],
-    ["PHARMACIST_CHAT", null],
+    ["PHARMACIST_CHAT", "callback"],
   ];
   for (const [intent, form] of forms) {
     const d = await ask("a message", intent);
@@ -185,6 +185,59 @@ async function main() {
     !/UTI|eye|red/i.test(phi.reply),
     phi.reply,
   );
+
+  /* The refusal boundary ────────────────────────────────────────────
+     The rule that keeps a shop inside a pharmacy lawful: a shopping message
+     with a symptom in it is a clinical question, and gets a pharmacist
+     rather than a product. These are the checks that matter most in this
+     file — a regression here sells someone a box instead of assessing them. */
+
+  const shopping = await ask("do you have claritin", "OTC_ORDER", { shop: true });
+  eq("a clean product request searches the shelf", shopping.shopQuery, "do you have claritin");
+  eq("a clean product request opens no form", shopping.form, null);
+  eq("a clean product request doesn't escalate", shopping.escalate, false);
+
+  const clinicalShopping = await ask("what can i take for my itchy watery eyes", "OTC_ORDER", {
+    shop: true,
+    classify: stub("OTC_ORDER", { contains_health_details: true }),
+  });
+  eq("a symptom in a shopping message searches nothing", clinicalShopping.shopQuery, null);
+  eq("a symptom in a shopping message escalates", clinicalShopping.escalate, true);
+  eq("a symptom in a shopping message opens the callback form", clinicalShopping.form, "callback");
+  check(
+    "and the reply sends them to a pharmacist without naming a product",
+    /pharmacist/i.test(clinicalShopping.reply) &&
+      !/claritin|allegra|antihistamine|loratadine/i.test(clinicalShopping.reply),
+    clinicalShopping.reply,
+  );
+
+  // The boundary must not be reachable by turning the shop off and on.
+  const noShop = await ask("do you have claritin", "OTC_ORDER");
+  eq("with no shop and no store, OTC goes to a person", noShop.escalate, true);
+  eq("with no shop and no store, nothing is searched", noShop.shopQuery, null);
+
+  const smsShopping = await ask("do you have claritin", "OTC_ORDER", {
+    channel: "sms", shop: true, storeUrl: "https://example.test/shop",
+  });
+  eq("SMS never returns a shop query — there are no cards there", smsShopping.shopQuery, null);
+  check("SMS gets the store link instead", smsShopping.reply.includes("https://example.test/shop"));
+
+  const clinicalOnSms = await ask("something for my itchy eyes", "OTC_ORDER", {
+    channel: "sms", shop: true, storeUrl: "https://example.test/shop",
+    classify: stub("OTC_ORDER", { contains_health_details: true }),
+  });
+  eq("the boundary holds on SMS too", clinicalOnSms.escalate, true);
+  check(
+    "and no store link is offered for a symptom",
+    !clinicalOnSms.reply.includes("https://example.test/shop"),
+    clinicalOnSms.reply,
+  );
+
+  // Only OTC_ORDER ever searches. A clinical intent must never carry a query.
+  for (const [intent] of forms) {
+    const d = await ask("do you have claritin", intent, { shop: true });
+    eq(`${intent} never returns a shop query`, d.shopQuery, null);
+  }
 
   /* Degrading safely ───────────────────────────────────────────────── */
 

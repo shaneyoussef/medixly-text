@@ -51,5 +51,11 @@
   text-align:center}
 
 /* Guests get intake only — no transcript, no history-bearing chrome. */
-.is-guest .mx-log .mx-msg,
-.is-guest .mx-jump{display:none}
+/* Guest is intake only: no message history, but the cards they came to use
+   have to stay. Form and shop cards are exempt — hiding those would leave a
+   guest with a rail that opens nothing. Same rule during checkout, where the
+   health conversation has no business sitting behind a payment surface. */
+.is-guest .mx-log .mx-msg:not(.mx-msg--form),
+.is-guest .mx-jump,
+.is-checkout .mx-log .mx-msg:not(.mx-msg--form),
+.is-checkout .mx-jump{display:none}

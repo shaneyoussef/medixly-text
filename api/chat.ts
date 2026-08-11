@@ -57,6 +57,8 @@ export async function POST(req: Request) {
       prior,
       phone: pharmacy?.phone,
       storeUrl: process.env.STORE_URL || undefined,
+      // The web chat can show product cards; SMS can't.
+      shop: channel === "web",
     });
 
     // PHIPA requires the custodian to account for every classification. The row
@@ -75,6 +77,7 @@ export async function POST(req: Request) {
         emergency: decision.emergency,
         degraded: decision.degraded,
         form: decision.form ?? decision.linkTo,
+        shopped: decision.shopQuery !== null,
       },
     });
 
@@ -87,6 +90,7 @@ export async function POST(req: Request) {
       intent: decision.intent,
       reply: decision.reply,
       form: decision.form,
+      shopQuery: decision.shopQuery,
       escalate: decision.escalate,
       emergency: decision.emergency,
       // Deliberately not returned: confidence and contains_health_details. They

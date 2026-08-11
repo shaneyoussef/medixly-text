@@ -20,12 +20,12 @@
   Every value comes from a design-system token — no raw hex, no off-scale
   sizes. Wiring instructions are at the bottom of secure-chat.demo.js.
 
-  Script order matters: core → forms → auth → print → demo. Nothing is
-  referenced at evaluation time across files, but `demo` constructs
-  everything, so it goes last.
+  Script order matters: core → forms → auth → shop → agent → print → demo.
+  Nothing is referenced at evaluation time across files, but `demo`
+  constructs everything, so it goes last.
 
-  A pharmacist answers this thread. `secure-chat.agent.js` exists and is not
-  loaded — see docs/AGENT.md.
+  The agent routes; a pharmacist answers anything it hands over. It never
+  suggests a product for a symptom — see docs/AGENT.md and docs/SHOP.md.
 
   The sign-in gate is not in this markup — `AuthGate` builds it and appends
   it to `.mx-chat` itself.
@@ -163,6 +163,8 @@
 <script src="secure-chat.core.js"></script>
 <script src="secure-chat.forms.js"></script>
 <script src="secure-chat.auth.js"></script>
+<script src="secure-chat.shop.js"></script>
+<script src="secure-chat.agent.js"></script>
 <script src="secure-chat.print.js"></script>
 <script src="secure-chat.demo.js"></script>
 </body>

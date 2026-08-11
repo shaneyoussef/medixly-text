@@ -55,7 +55,10 @@ const SERVICES = [
   { icon: 'pill',        label: 'Refill',                 form: 'refill'   },
   { icon: 'camera',      label: 'Send a prescription',    form: 'upload'   },
   { icon: 'stethoscope', label: 'Minor ailment',          form: 'ailment'  },
-  { icon: 'phone',       label: 'Speak to a pharmacist',  form: 'callback' }
+  { icon: 'phone',       label: 'Speak to a pharmacist',  form: 'callback' },
+  // `shop: true` runs a product search locally. Browsing the shelf sends no
+  // message and involves no model \u2014 see docs/SHOP.md.
+  { icon: 'shopping-bag', label: 'Shop the shelf',        shop: true, query: '' }
 ];
 
 /* ── Option lists ─────────────────────────────────────────────────────
