@@ -6,9 +6,9 @@ A patient texts the pharmacy's number. An AI agent classifies the request and re
 with a secure link to the matching Medixly form. **SMS is the front door only** — all
 protected health information (PHI) is collected on encrypted, Canadian-hosted forms.
 
-The agent routes; it does not converse. It never asks for symptoms or medication
-names, never answers a clinical question, and never repeats health details back —
-see [`docs/AGENT.md`](docs/AGENT.md).
+A pharmacist answers the patient thread. The routing agent is written and parked
+until the pharmacy wants it — [`docs/AGENT.md`](docs/AGENT.md) covers what it
+does and what switching it on would require.
 
 ## The rule everything else depends on
 
@@ -82,14 +82,19 @@ Treat it as one row, not as multi-tenancy.
 
 Pre-pilot, and not approved for real patient data — see [`docs/PIA.md`](docs/PIA.md) §10.
 
-Written but not yet run end to end: the classifier and its test set, the agent
-that routes on it, the submission endpoint and database schema, the staff queue
-page, and the patient secure chat client. Nothing has been deployed to Canadian
-infrastructure, which Phase 5 requires before the first real patient.
+The patient chat client works in a browser: five forms — transfer, refill,
+prescription upload, minor ailment assessment, pharmacist callback — each
+paginated, validated, and reconciled against the fields `api/submit.ts` stores.
 
-The chat client's agent wiring works in a browser against a keyword stub —
-`POST /api/chat` has not been deployed, so no message has been through the real
-classifier yet.
+Written but not yet run against a server: the submission endpoint, the classifier
+and its test set, the routing agent, and the staff queue page. Nothing has been
+deployed to Canadian infrastructure, which Phase 5 requires before the first real
+patient.
+
+Two things gate the forms regardless of infrastructure. The consent block is a
+draft and needs the privacy officer; the minor ailment assessment's red-flag
+questions must come from the pharmacy's clinical protocol and are deliberately
+absent until they do. Both are in [`web/HANDOFF.md`](web/HANDOFF.md).
 
 ---
 

@@ -15,15 +15,14 @@ Toll-free verification is mandatory: unverified numbers are blocked outright.
 Missing business registration details is the most common rejection reason.
 
 ## Phase 1 — Prove the loop without a number
-- [x] Reply logic — `api/agent.ts`, shared by web chat and SMS
-- [x] Chat page wired to it — `MedixlyAgent` posts to `POST /api/chat`
-- [ ] Deploy `POST /api/chat` so the real classifier is in the loop
-      (it runs against a keyword stub today, see `docs/AGENT.md`)
-- [ ] Somewhere for an escalated turn to land — `escalate` currently stops at
-      the browser
-- [ ] Rate limit the chat endpoint before it is reachable from the internet
+- [x] Chat page with a working service rail and five submittable forms
+- [x] Client reconciled against `api/submit.ts` — every field maps to a key the
+      server stores
 - [ ] Test with fake patient data only
 - [ ] Watch a real person use it before building anything else
+
+A pharmacist answers the thread to start with. The routing agent is written and
+parked — see `docs/AGENT.md` for what it would take to switch on.
 
 This becomes a permanent chat widget on the pharmacy site, not a throwaway rig.
 
@@ -38,13 +37,18 @@ Raw accuracy is the wrong target. A refill that lands on PHARMACIST_CHAT is fine
 A clinical concern that lands on an OTC form is not.
 
 ## Phase 3 — The transfer loop
-- [ ] Transfer form (the acquisition intent — build this one first)
-- [ ] Database table for submissions
-- [ ] Email notification when a submission lands
+- [x] Transfer form (the acquisition intent — built first)
+- [x] Database table for submissions
+- [ ] Deploy `POST /api/submit` and submit one request end to end
+- [ ] `sendMail()` is a stub that throws — wire Hushmail or SES
+- [ ] Normalise phone numbers in `api/submit.ts`; it rejects "+1 416 555 0100"
 - [ ] Simple queue page to view and mark requests done
+- [ ] Privacy officer sign-off on the consent block
+- [ ] Red-flag screening questions from the pharmacy's clinical protocol,
+      before the assessment form is exposed to anyone real
 
-One form, one table, one email, one list. The other five forms are copies with
-different fields.
+One form, one table, one email, one list. The other four forms are built and
+are copies with different fields, exactly as predicted.
 
 ## Phase 4 — SMS adapter
 - [ ] Twilio webhook with signature verification

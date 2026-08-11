@@ -1,12 +1,23 @@
 # Agent
 
+> **Parked.** A pharmacist answers the patient thread directly, so
+> `secure-chat.agent.js` is not loaded by `web/form/index.html` and
+> `POST /api/chat` is not deployed. Nothing in the client calls any of it.
+>
+> The code stays because it is tested and self-contained, and because the SMS
+> adapter needs exactly this layer when it arrives — SMS has no service rail to
+> tap, so something has to turn a text message into an intent.
+>
+> Before switching it back on for web chat, read the security section at the
+> bottom. The short version: the classifier reading a web chat message is a
+> different privacy proposition from it reading an SMS, and three documents would
+> need updating.
+
 `classify.ts` says what a message *is*. The agent says what to *do* about it.
 
-The chat client used to answer a message by matching the word "transfer" in the
-browser. It now posts each message to an endpoint that runs the real classifier
-and returns a decision — a reply, and where relevant the form card to open. Same
-code answers SMS, which is the point: the cognition is one module, and the
-channels are adapters.
+The design: a message posts to an endpoint that runs the real classifier and
+returns a decision — a reply, and where relevant the form card to open. One
+module of cognition, and the channels are adapters onto it.
 
 ## It is a router, not a chatbot
 
@@ -136,10 +147,16 @@ health detail.
 
 ## Known gaps
 
-**No vaccine intent.** The chat client has a `vaccine` form card and the
-classifier has no intent that reaches it, so it is only reachable from the
-service rail. Whether vaccine booking is a seventh intent is a decision for the
-pharmacy, not one to guess at here.
+**No vaccine intent, and no vaccine form either.** `request_intent` in
+`db/schema.sql` has six values and vaccine booking isn't one, so neither the
+classifier nor `api/submit.ts` can route one. Whether vaccines are a seventh
+intent is a decision for the pharmacy; it needs a migration, not a guess here.
+
+**`callback` has no place in the intent → form map.** The client's five forms are
+`transfer`, `refill`, `upload`, `ailment` and `callback`; the agent's map covers
+the first four and treats `PHARMACIST_CHAT` as escalate-with-no-card. Now that a
+callback form exists, `PHARMACIST_CHAT` should probably open it instead. One line
+in `FORM_FOR`, and a test — do it when the agent comes off the shelf.
 
 **Escalation has nowhere to land.** `escalate: true` reaches the browser and
 stops. The staff queue reads `requests`, and a chat turn isn't one.
@@ -159,3 +176,60 @@ can legitimately contain health details, and classification happens at
 Anthropic. That is contemplated — Anthropic is on the list of service providers
 needing a written agreement in `ROADMAP.md` Phase 0 — but the agreement has to be
 in place before real patients, and `docs/PIA.md` should name the flow explicitly.
+
+---
+
+## Security — read this before switching it back on
+
+Parking the agent closed a question it had opened, and the answer is written
+down here so it doesn't have to be rediscovered.
+
+`docs/COMPLIANCE.md` says the classifier "may **incidentally** see health info."
+That is true on **SMS**, where *no PHI over SMS* is a rule the system enforces —
+which is what made an Anthropic subprocessor acceptable in the first place. On
+**web chat it inverts.** The chat is the secure channel: the page tells patients
+their conversation is protected, `docs/privacy-documents.md` §4 tells them to use
+it *instead of* text and email, and the assessment form is symptoms by design. A
+classifier on that channel sees high-sensitivity PHI routinely, not incidentally.
+
+So turning it on for web chat is not a config change. Three claims break:
+
+| Where | Claim | Reality with a US classifier in the web path |
+|---|---|---|
+| `docs/PIA.md` §8 | Anthropic — "not yet in production path", exposure "when SMS launches" | In the path, via web chat, before SMS |
+| `docs/PIA.md` §10 risk 12 | "Data residency — **Closed** — `ca-central-1`" | Reopened — `api/classify.ts` posts to `api.anthropic.com` |
+| `docs/privacy-documents.md` §4 | "stored in **Canada**"; only a first name leaves the country | False — health information would leave it |
+
+What would make it defensible, in the order that matters:
+
+1. **Run classification in Canada.** `classify()` is one `fetch` in one function,
+   so this is a one-function change: Claude on Bedrock in `ca-central-1`, or
+   Vertex AI in `northamerica-northeast1`. Verify the model is actually offered
+   in the region before committing to it. This is what re-closes risk 12.
+2. **Minimise what crosses the boundary.** Intent routing never needs a name,
+   date of birth, health card number, phone or email — strip them before the
+   call. Minimisation, not anonymisation: symptoms remain and the session still
+   ties the message to a person.
+3. **Require a session and rate limit `POST /api/chat`.** It is unauthenticated
+   as written, so anyone can post text and spend credits.
+4. **Keep message text out of the logs.** `classify()` throws with the provider's
+   error body in the message (`api/classify.ts`), and `api/agent.ts` logs that
+   error. A 400 body can echo request content, which would put patient text in
+   logs the audit design deliberately keeps text out of. Log the status only.
+5. **Get the subprocessor agreement and zero retention in writing**, and disclose
+   the flow in the privacy notice.
+
+One control already exists and is the reason parking the agent costs so little:
+`renderServices()` routes a service-rail chip straight to `requestForm()`. **No
+text leaves the device and no model is involved.** Every chip in
+`secure-chat.forms.js` carries `form:` for exactly that reason. The agent's value
+was never the five things a chip already does — it was free text, and a
+pharmacist reads that better than a classifier does.
+
+Last thing, and it is independent of region: `web/form/index.html` tells patients
+"This conversation is encrypted end to end." An agent has to read the plaintext,
+so a third party reads it in the middle, and that claim does not survive in any
+region. The trust badge ("transmitted securely via Hushmail for Healthcare") is
+defensible; "end to end" is not. `web/HANDOFF.md` says to ask before changing
+compliance wording, so it is flagged rather than changed — it belongs with the
+privacy officer, alongside the PHIPA-versus-PIPEDA question.

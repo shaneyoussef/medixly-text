@@ -12,10 +12,10 @@ All files live in `web/form/`, which is the patient site's Netlify publish
 directory — so the chat is served at that site's root. They were previously one
 106KB `secure-chat.html`; the split version replaces it in place.
 
-**Two files have not landed yet**, and both are currently stood up by a
-placeholder so the page loads on a deploy preview. With the placeholder in
-place there is no service rail, no form card and no consent block: **the page
-cannot submit anything.** Replace both files wholesale; don't merge into them.
+`secure-chat.forms.js` has landed, so the rail, the form cards and the consent
+block are real and **the page submits.** `secure-chat.print.js` is still a
+placeholder — no print or fax sheet can be generated. Replace it wholesale;
+don't merge into it.
 
 | File | What's in it | Landed |
 | --- | --- | --- |
@@ -24,49 +24,75 @@ cannot submit anything.** Replace both files wholesale; don't merge into them.
 | `secure-chat.css` | All chat styling. | yes |
 | `secure-chat.auth.css` | Sign-in gate styling. | yes |
 | `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
-| `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | **placeholder** |
+| `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | yes |
 | `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
-| `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision — reply, and the form card to open. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
-| `secure-chat.demo.js` | Stub transport, stub router, boot. Replace to go live. | yes |
+| `secure-chat.demo.js` | Stub transport, the submission mapper, boot. Replace the transport to go live; keep the mapper. | yes |
+
+`secure-chat.agent.js` also exists and is **not loaded**. A pharmacist answers
+this thread; see [`../docs/AGENT.md`](../docs/AGENT.md).
 
 ### Features built
 
 Messaging with delivery/read states and tap-to-retry. Attachments via camera,
 photo library or file, with client-side downscaling to 2048px. Voice notes with
 waveform capture and playback. A horizontally scrolling service rail. Five
-paginated form cards — transfer, refill, upload, vaccine booking, minor ailment
-assessment — each 3–6 short pages ending in review, consent, submit.
+paginated form cards — transfer, refill, prescription upload, minor ailment
+assessment, pharmacist callback — each 3 to 5 short pages ending in review,
+consent, submit.
 
-The service rail and the five form cards are rendered by `core` but defined in
-`forms`, so neither appears until that file lands.
-
-Messages are answered by the agent rather than by a person: it classifies each
-one and opens the matching form card in the thread. Emergencies bypass the
-typing indicator entirely.
+Identity answers arrive prefilled for a signed-in patient. Consent never does.
 
 ### Load order matters
 
-`core` → `forms` → `auth` → `agent` → `print` → `demo`. Nothing is referenced at
+`core` → `forms` → `auth` → `print` → `demo`. Nothing is referenced at
 evaluation time across files, but `demo` constructs everything.
 
-### The agent answers the messages
+### The forms are data, the markup is core's
 
-`SecureChat` sends what you type and renders what arrives; `MedixlyAgent` is the
-half that decides what arrives. It owns the transport's `send` — `POST /api/chat`
-is both the delivery receipt and the reply, so a 200 means the pharmacy has the
-message and the body says what to answer with. Attachments and form submission
-stay with the rest of the transport.
+`forms.js` touches the DOM in exactly one place — `consentBlock()`. Everything
+else is schema, and `core` builds the elements from it. So a new field type is a
+change to `fieldEl()` in core; a new question is a change to `forms.js` alone,
+with no markup and no CSS.
 
-Reply copy, the intent → form map, the emergency tripwire and the two-strikes
-rule are all server-side in `api/agent.ts`, because SMS runs the same code. Do
-not add reply text to the browser: two copies is how the two channels drift
-apart. See [`../docs/AGENT.md`](../docs/AGENT.md).
+Five exports and `core` reads nothing else: `SERVICES`, `FORMS`,
+`consentBlock()`, `CONSENT_ERROR`, `vaccineBy()`. Declaration order matters —
+`FORMS` is an object literal, so its option lists have to be declared above it.
 
-`secure-chat.demo.js` currently points the agent at a keyword stub, so a deploy
-preview shows the routing without a server. It is not the classifier and its
-copy is not the agent's copy — both facts are shouted in a `console.warn`, the
-same way the placeholder files are. Drop the `route` option to go live.
+### Reconciled against the server
+
+`api/submit.ts` whitelists per intent and silently drops anything else, so the
+client now collects only what that endpoint stores. Three things came out of
+doing that reconciliation, and all three are load-bearing:
+
+- **No medication names anywhere.** `docs/PIA.md` §4 lists them under
+  "deliberately not collected", so the transfer form's `scope` is all-or-some
+  with no "which ones" box, and the refill form takes a prescription number with
+  no "or describe it" field. A free text box asking which prescriptions is
+  asking for drug names by another route, and collecting them would move both
+  forms from low- to high-sensitivity PHI.
+- **`RX_UPLOAD` needs a stored path, not a blob.** `file_path` is required and
+  the server writes whatever it is handed, so the transport uploads first and
+  passes the returned path. The demo's `URL.createObjectURL` stub puts a `blob:`
+  URL in that field, which is dead the moment the tab closes — that stub must
+  not ship.
+- **No assessment signature.** `MINOR_AILMENT` has no column for one, so the
+  consent record with its own timestamp is the attestation. A signature field
+  would have been collected and discarded.
+
+Also found: `api/submit.ts` rejects a phone number that carries a country code,
+because `digits()` requires exactly ten. Patients write their own number as
+"+1 416 555 0100". `tenDigits()` in core drops a leading 1 and the mapper sends
+ten digits, so the client no longer trips it — **but the server should do the
+same normalisation**, or the SMS and voice adapters will hit it.
+
+### The submission mapper
+
+`toSubmission()` in `secure-chat.demo.js` is the seam the client and server meet
+at, and it is not demo scaffolding — keep it when the transport is replaced. It
+maps client field names to the server's whitelisted keys, normalises the phone
+number, and stamps consent. A field that isn't in that table is a field that
+never gets stored.
 
 ---
 
@@ -94,19 +120,15 @@ paraphrase, shorten or "improve" them. Errors say what to do, not what broke.
 
 ## Reconcile with the server first
 
-The client form schemas in `secure-chat.forms.js` were built from the Medixly
-product spec, **not** from this repo's API. The server is authoritative.
+Done for the five forms that ship — the findings are under "Reconciled against
+the server" above. The rule still stands for anything new: `api/submit.ts` is
+authoritative, it whitelists per intent, and a field it doesn't recognise is a
+field that never gets stored. Check `db/schema.sql` for the column before adding
+the question.
 
-Before building anything new:
-
-- Reconcile the form schemas against the intents and required-field maps in
-  `api/submit.ts` (`TRANSFER`, `REFILL`, `RX_UPLOAD`, …). Flag any field the
-  client collects that the server doesn't expect, and vice versa.
-- Check consent handling against the `consent_given`, `consent_at` and
-  `consent_method` columns in `db/schema.sql`. The client already captures all
-  three; make sure the names and shapes line up.
-
----
+Consent lines up: the client sends `{ given, at, method }` and the server stores
+`consent_given`, `consent_at`, `consent_method`, rejecting anything without
+`given === true`.
 
 ## Architecture: the platform is a courier, not an archive
 
@@ -162,33 +184,35 @@ system answers the substantive part of any patient request.
 
 ## Tasks
 
-1. **Confirm the split page loads.** The shell has replaced the old monolith in
-   place and was checked in Chromium against the real `core`, `auth` and `demo`
-   files, with throwaway stubs standing in for the two that hadn't landed:
-   history renders with day dividers, the composer flips mic to send, the attach
-   sheet traps focus and closes on Escape, and a sent message runs sending →
-   delivered → read. Re-run this against the real `forms` and `print` once they
-   land — that is the check that counts.
-
-   The agent wiring was checked the same way, against the stub router: sign-in →
-   send → reply in the thread, with `requestForm` called with `transfer`,
-   `refill`, `upload` and `ailment` for those four intents and not called for
-   `PHARMACIST_CHAT` or `OTC_ORDER`. Two `UNCLEAR` turns in a row produced the
-   question and then the handoff, and an emergency message was answered inside
-   900ms with no typing pause. The cards themselves still can't render, so
-   `requestForm` was observed rather than seen — that part re-runs with `forms`.
+1. ~~**Confirm the split page loads.**~~ Done, and re-run against the real
+   `forms.js` in Chromium: the rail renders five chips and each opens its card,
+   history shows day dividers, the composer flips mic to send, the attach sheet
+   traps focus and closes on Escape, and a sent message runs sending →
+   delivered → read. All five forms were walked end to end — per-field
+   validation with focus moving to the first bad field, an Edit link from the
+   review page jumping back, the consent gate, and the submitted receipt — and
+   every mapped payload was checked against `api/submit.ts`'s whitelist. Worth
+   re-running once `print` lands.
 
 2. ~~**`SecureChat.prototype.setProfile(profile)`** in core~~ Done. Stores the
    profile and drops any unsubmitted form card from the cache so it rebuilds.
    Submitted cards are receipts and are left alone. Nothing carries consent
    across — see task 4.
 
-3. **`identity` field type** in `fieldEl()`. With a non-guest profile, render a
-   confirm row — "We'll use: {name} · {phone} · {email}" — with a Change link
-   that expands to the fields. Guest or incomplete profile renders fields
-   normally. Then in `secure-chat.forms.js`, collapse the "About you" and "How
-   to reach you" pages of `transfer`, `refill`, `upload` and `vaccine` into one
-   `identity` page. Removes a page from each flow.
+3. ~~**One identity page per form**~~ Done, but not the way this task
+   described it, and the deviation is deliberate. The five forms share one
+   "About you" page, and `seedIdentity()` in core prefills name, phone and date
+   of birth from the signed-in profile — so nobody retypes what the pharmacy
+   holds, which was the point.
+
+   What is *not* built is the confirm row — "We'll use: {name} · {phone} ·
+   {email}" with a Change link. Two reasons. It fights the machinery: the review
+   page and `validate()` both iterate a step's declared fields and read
+   `m.values[f.name]`, so a composite field would drop identity off the review
+   summary and out of validation. And it named an email field, which the server
+   has no column for — showing an address in a submission summary implies it
+   travels with the submission when it doesn't. Prefilled editable fields give
+   the same saving with none of that.
 
 4. **Never prefill consent or the assessment signature.** Each submission needs
    its own consent record with its own timestamp. Not an optimisation for later.
@@ -237,26 +261,53 @@ system answers the substantive part of any patient request.
 
 **`SCREENING` in `secure-chat.forms.js` is deliberately empty.** Step 4 of the
 minor ailment assessment needs five condition-specific yes/no red-flag questions
-for each of 16 conditions. These determine whether a pharmacist may assess and
-prescribe. They must come from the pharmacy's own clinical protocol. **Do not
-invent them.** The visible "not loaded yet" notice stays until real ones are
-supplied.
+for each of the 16 conditions. These determine whether a pharmacist may assess
+and prescribe, or whether the patient needs a physician or an emergency
+department. They must come from the pharmacy's own clinical protocol. **Do not
+invent them** — plausible-looking questions would be the most dangerous thing in
+this codebase, because a patient who should have been sent to hospital would get
+a form that looked complete. Every condition currently falls through to a visible
+"not loaded yet" notice, keyed by the exact strings in `CONDITIONS`.
+
+**The consent block is a draft.** `web/HANDOFF.md` called it a verbatim fixed
+string, but the file carrying that string never landed here, so there was no
+original to reproduce. What ships is derived from the privacy notice in
+`docs/privacy-documents.md` §4 rather than invented, and it **needs the privacy
+officer's sign-off before a real patient sees it.** Once signed off it becomes
+fixed copy like the rest.
+
+It also names **PHIPA**, while the trust badge under the composer names
+**PIPEDA** because that string comes from `COUNTRY` in `secure-chat.core.js`.
+Both cannot be right — see the open question below, and change them together.
+
+**No vaccine form, and no OTC form.** Not an oversight in the client: there is
+nowhere for either to land. `request_intent` in `db/schema.sql` has six values
+and vaccine booking is not one, so `api/submit.ts` would reject a booking as an
+unknown request type — a form that collects a patient's details and then fails is
+worse than no form. `OTC_ORDER` does exist server-side, but the storefront it
+should point at doesn't. Vaccines need the pharmacy's decision, then a migration
+plus an `api/submit.ts` entry. `vaccineBy()` still ships because `core` references
+it for the `pool` and `days` field types; it returns null and warns.
+
+**Vaccine inventory** belongs to the pharmacist dashboard, not hardcoded in the
+client, whenever that form is built.
 
 **PHI transport.** Message bodies and attachments must travel over Hushmail for
 Healthcare, not a generic object store. The `URL.createObjectURL` stub in
-`secure-chat.demo.js` must not ship.
+`secure-chat.demo.js` must not ship — and on `RX_UPLOAD` it is worse than a stub,
+because the `blob:` URL it produces is written to `file_path` and is dead as soon
+as the tab closes.
 
-**Vaccine inventory** is hardcoded in `secure-chat.forms.js`. It belongs to the
-pharmacist dashboard.
-
-**No intent reaches the `vaccine` card.** The classifier has six intents and none
-of them is vaccine booking, so that form is only reachable from the service rail
-— the agent will never open it. Whether vaccines are a seventh intent is a
-decision for the pharmacy, not one to guess at.
+**`firstIncompleteStep()` is currently unreachable.** It guards the case where
+editing an earlier page leaves a required answer blank on a page you then skip
+past. None of the five forms have cross-step `showWhen` dependencies, and
+`Continue` refuses to advance past a blank required field, so there is no path to
+it today. Keep it — the moment a form gets a conditional page, it matters again.
 
 **Delivery method casing.** The spec writes "Store Pickup" / "Local Delivery";
 the design system mandates sentence case, so they render as "Store pickup" /
-"Local delivery". Revert if those strings feed a pharmacy-side system.
+"Local delivery". Revert if those strings feed a pharmacy-side system that
+matches on them.
 
 ---
 

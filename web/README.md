@@ -12,15 +12,19 @@ advertised; `queue/` must never be.
 | `queue/` | Pharmacy staff | `web/queue` | Private — Netlify visitor access set to private, plus the staff key |
 
 `form/` holds the secure chat client, served at that site's root from
-`index.html`. It is **not submittable yet** — `secure-chat.forms.js` and
-`secure-chat.print.js` are placeholders, so there is no service rail, no form
-card and no consent block. See [`HANDOFF.md`](HANDOFF.md).
+`index.html`. Five forms work end to end against a stub transport — transfer,
+refill, prescription upload, minor ailment assessment and pharmacist callback —
+each mapped to an intent `api/submit.ts` accepts. `secure-chat.print.js` is still
+a placeholder, so no print or fax sheet can be generated. See
+[`HANDOFF.md`](HANDOFF.md).
 
-Messages are answered by the agent (`secure-chat.agent.js` → `POST /api/chat`),
-which classifies each one and opens the matching form card. That endpoint isn't
-deployed, so the page currently routes against a keyword stub in
-`secure-chat.demo.js` — it shows the behaviour and demonstrates nothing about
-classification. See [`../docs/AGENT.md`](../docs/AGENT.md).
+A pharmacist answers the thread. There is no agent in the page: the service rail
+and the form cards are how a request starts. `secure-chat.agent.js` exists and is
+not loaded — see [`../docs/AGENT.md`](../docs/AGENT.md).
+
+Two things must change before a real patient: the consent block needs the privacy
+officer's sign-off, and the minor ailment assessment's red-flag questions have to
+come from the pharmacy's clinical protocol. Both are flagged in `HANDOFF.md`.
 
 Never set a publish directory to `web/` itself. That would serve `queue/` from
 the public site.

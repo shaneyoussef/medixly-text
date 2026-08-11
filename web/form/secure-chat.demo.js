@@ -1,5 +1,10 @@
 /* ════════════════════════════════════════════════════════════════════
    Demo wiring — replace everything below to go live.
+
+   A pharmacist answers this thread. There is no agent in this page: the
+   rail and the form cards are how a request starts, and a message is just
+   a message waiting for a person. `api/agent.ts` and
+   `secure-chat.agent.js` exist and are not loaded — see docs/AGENT.md.
    ════════════════════════════════════════════════════════════════════ */
 
 const at = (daysAgo, h, m) => {
@@ -19,90 +24,116 @@ const seed = [
   { from: 'them', text: 'Yes. Take it with your largest meal to reduce stomach upset. If you miss a dose, skip it and take the next one at the usual time — don\u2019t double up.', ts: at(0, 9, 10) }
 ];
 
-/* ── Stub router ───────────────────────────────────────────────────────
-   Stands in for `POST /api/chat` on a deploy preview, where there is no
-   server to call. It matches keywords; it is not the classifier, and the copy
-   below is not the agent's copy. The real intents, reply templates, emergency
-   tripwire and two-strikes rule are all in `api/agent.ts`.
+/* ── The submission mapper ─────────────────────────────────────────────
+   Form values in, `POST /api/submit` body out. This is the seam the client
+   and the server meet at, and it is not cosmetic: `api/submit.ts`
+   whitelists per intent and drops anything it doesn't recognise, so a
+   field that isn't mapped here is a field that silently never gets stored.
 
-   It exists so the routing behaviour can be seen in a browser. It demonstrates
-   nothing about how a real message gets classified. To go live, drop the
-   `route` option so MedixlyAgent calls the endpoint, and delete this block.
+   Field names are the client's; keys are the server's. Keep both columns
+   in step with the `FORMS` table in api/submit.ts.
    ─────────────────────────────────────────────────────────────────── */
 
-console.warn(
-  '[SecureChat] the agent is running against a keyword stub, not the classifier. ' +
-  'Replies are placeholders. See api/agent.ts for the real routing.'
-);
-
-const STUB_ROUTES = [
-  { intent: 'TRANSFER',        form: 'transfer', re: /transfer|switch(ing)? pharmac|move my (script|prescription)/i },
-  { intent: 'REFILL',          form: 'refill',   re: /refill|running low|more of my|repeat/i },
-  { intent: 'RX_UPLOAD',       form: 'upload',   re: /new prescription|upload|paper (rx|script)|from (my|the) doctor/i },
-  { intent: 'MINOR_AILMENT',   form: 'ailment',  re: /rash|pink eye|cold sore|heartburn|uti|hives|sprain|acne/i },
-  { intent: 'PHARMACIST_CHAT', form: null,       re: /pharmacist|interact|side effect|dose|dosing|missed/i },
-  { intent: 'OTC_ORDER',       form: null,       re: /vitamin|tylenol|advil|supplement|order|buy/i }
-];
-
-// Deliberately short, only so the path is visible in a preview. The real list,
-// and the reasoning for having one at all, are in api/agent.ts.
-const STUB_EMERGENCY = /chest pain|can\u2019t breathe|can't breathe|trouble breathing|severe bleeding|suicidal/i;
-
-const stubRoute = async (text, prior) => {
-  await wait(600);
-
-  if (STUB_EMERGENCY.test(text)) {
-    return {
-      intent: 'PHARMACIST_CHAT', form: null, escalate: true, emergency: true,
-      reply: 'If this is an emergency, call 911 or go to your nearest emergency department now. Don\u2019t wait for a reply here.'
-    };
+const SUBMISSIONS = {
+  transfer: {
+    intent: 'TRANSFER',
+    payload: v => ({ from_pharmacy: v.fromPharmacy, scope: v.scope, notes: v.notes })
+  },
+  refill: {
+    intent: 'REFILL',
+    payload: v => ({ rx_numbers: entries(v.rxNumbers), pickup_or_delivery: v.delivery, notes: v.notes })
+  },
+  upload: {
+    intent: 'RX_UPLOAD',
+    // file_path comes from the upload, not from the form — see toSubmission().
+    payload: (v, paths) => ({ file_path: paths[0], prescriber: v.prescriber, notes: v.notes })
+  },
+  ailment: {
+    intent: 'MINOR_AILMENT',
+    payload: v => ({ condition: v.condition, duration: v.duration, prior_treatment: v.priorTreatment, notes: v.notes })
+  },
+  callback: {
+    intent: 'PHARMACIST_CHAT',
+    payload: v => ({ topic: v.topic, best_time: v.bestTime, notes: v.notes })
   }
-
-  const hit = STUB_ROUTES.find(r => r.re.test(text));
-
-  // Second unclear turn in a row hands off — the same rule the agent applies.
-  if (!hit) {
-    return prior.at(-1) === 'UNCLEAR'
-      ? { intent: 'UNCLEAR', form: null, escalate: true,
-          reply: 'I\u2019m not sure I\u2019ve got this right, so I\u2019ve passed it to the team. Someone will reply here.' }
-      : { intent: 'UNCLEAR', form: null, escalate: false,
-          reply: 'Happy to help — is this about a prescription, a health concern, or an over-the-counter product?' };
-  }
-
-  return {
-    intent: hit.intent,
-    form: hit.form,
-    escalate: !hit.form,
-    reply: hit.form
-      ? '[stub reply] Fill this in and we\u2019ll take it from there.'
-      : '[stub reply] I\u2019ve flagged this for a pharmacist. They\u2019ll reply here.'
-  };
 };
 
+/** A `list` field always holds at least one empty string. Drop the blanks. */
+const entries = list => (list || []).map(s => String(s).trim()).filter(Boolean);
+
+/** Drops empty values, the same way api/submit.ts does before storing. */
+const prune = obj => Object.fromEntries(
+  Object.entries(obj).filter(([, v]) =>
+    v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length))
+);
+
+function toSubmission(payload, paths = []) {
+  const spec = SUBMISSIONS[payload.form];
+  if (!spec) throw new Error(`no submission mapping for form "${payload.form}"`);
+  const v = payload.values;
+
+  return {
+    intent: spec.intent,
+    channel: 'web',
+    patient: {
+      // tenDigits() lives in core, next to the field validation that uses it.
+      name: String(v.fullName || '').trim(),
+      phone: tenDigits(v.phone) || '',
+      dob: v.dob || null
+    },
+    payload: prune(spec.payload(v, paths)),
+    // Each submission carries its own consent timestamp. Never reused, never
+    // prefilled — see web/HANDOFF.md task 4.
+    consent: {
+      given: payload.consent === true,
+      at: payload.consentAt,
+      method: 'checkbox'
+    }
+  };
+}
+
 /* ── Transport ─────────────────────────────────────────────────────────
-   `send` is the agent's and is layered on by MedixlyAgent.transport() below;
-   everything else is faked here.
+   Faked here. `send` resolves a receipt and a pharmacist answers a while
+   later; `submitForm` maps and logs instead of posting.
    ─────────────────────────────────────────────────────────────────── */
 
 const demoTransport = {
-  submitForm(payload) {
-    console.log('[SecureChat] form submitted', payload);
-    const replies = {
-      transfer: v => `Got it. We\u2019ve contacted ${v.prevPharmacyName || 'your previous pharmacy'} and will message you here once your prescription is ready. This usually takes 1\u20132 business days.`,
-      refill:   v => `Thanks ${(v.fullName || '').split(' ')[0] || 'Maya'} — your refill is in the queue. We\u2019ll message you here when it\u2019s ready.`,
-      upload:   () => 'Thanks — a pharmacist is reviewing your prescription now and will message you if anything is unclear.',
-      vaccine:  v => v.clinicDay
-        ? `You\u2019re booked for ${v.clinicDay}. Bring your health card and wear a short sleeve.`
-        : 'Thanks — we\u2019ll be in touch by encrypted email as soon as we have news.',
-      ailment:  () => 'Thanks — a pharmacist is reviewing your assessment and will message you here shortly.'
-    };
-    return new Promise(resolve => setTimeout(() => {
-      resolve({ ok: true });
-      setTimeout(() => chat.setTyping(true), 900);
-      setTimeout(() => chat.receive({ text: replies[payload.form](payload.values) }), 2400);
-    }, 900));
+  send(msg) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve({ status: 'delivered', ts: Date.now() });
+
+        // Read receipts mean a person opened the thread. Faked so the
+        // sending → delivered → read run is visible on a preview.
+        setTimeout(() => chat.setStatus(msg.id, 'read'), 1200);
+
+        setTimeout(() => chat.setTyping(true), 1800);
+        setTimeout(() => chat.receive({
+          text: 'Thanks Maya — a pharmacist has your message and will reply shortly. If this is urgent, call us at [Phone Number].'
+        }), 3600);
+      }, 700);
+    });
   },
+
+  async submitForm(payload) {
+    // Attachments are stored first, so file_path points at something.
+    const paths = [];
+    for (const file of payload.blobs || []) {
+      const { url } = await demoTransport.upload(file);
+      paths.push(url);
+    }
+
+    const body = toSubmission(payload, paths);
+    console.log('[SecureChat] POST /api/submit', body);
+
+    await wait(900);
+    setTimeout(() => chat.setTyping(true), 900);
+    setTimeout(() => chat.receive({ text: FORMS[payload.form].done(payload.values).note }), 2400);
+    return { reference: 'DEMO-00000', status: 'received' };
+  },
+
   subscribe() {},
+
   // Fakes a chunked upload so the progress bar is exercised.
   upload(file, onProgress) {
     return new Promise(resolve => {
@@ -116,32 +147,15 @@ const demoTransport = {
   }
 };
 
-// Drop `route` to send messages to the real endpoint instead of the stub.
-const transport = MedixlyAgent.transport(demoTransport, { route: stubRoute });
-
-// Read receipts belong to `subscribe` in production — they mean a pharmacist
-// opened the thread, which is not something the agent can know. Faked here so
-// the sending → delivered → read run is still visible on a preview.
-const agentSend = transport.send;
-transport.send = async msg => {
-  const receipt = await agentSend(msg);
-  setTimeout(() => chat.setStatus(msg.id, 'read'), 1200);
-  return receipt;
-};
-
 const chat = new SecureChat(document.getElementById('chat'), {
   pharmacyName: 'Medixly',
   presence: 'Pharmacist on duty · replies within 2 hours',
   country: 'Canada',
   history: seed,
-  transport,
+  transport: demoTransport,
   onBack: () => console.log('[SecureChat] back'),
   onCall: () => console.log('[SecureChat] call [Phone Number]')
 });
-
-// The agent answers into the thread, so it needs the instance — and the chat
-// needed the transport first.
-transport.agent.attach(chat);
 
 /* ── Auth gate ─────────────────────────────────────────────────────────
    A stub `auth` matching the contract at the bottom of secure-chat.auth.js.
@@ -156,7 +170,7 @@ const demoPatient = {
   id: 'demo-0001',
   name: 'Maya Halloran',
   email: 'maya@example.com',
-  phone: '+1 555 0100',
+  phone: '416 555 0100',
   dob: '1988-04-12',
   healthCard: '1234-567-890-AB',
   hasPasskey: false,
@@ -192,25 +206,44 @@ new AuthGate(document.getElementById('chat'), {
 });
 
 /* ── Going live ───────────────────────────────────────────────────────
-   Two things change. Point the agent at the endpoint by dropping `route`:
+   Keep `toSubmission()` — it is the real mapping, not demo scaffolding —
+   and replace the transport around it:
 
-     const transport = MedixlyAgent.transport(realTransport);
-
-   and replace the rest of the transport with the real one:
-
-   const realTransport = {
+   const transport = {
+     async send(msg) {                       // msg: {id, text, ts, files}
+       const r = await fetch('/api/chat/send', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ id: msg.id, text: msg.text, files: msg.files })
+       });
+       if (!r.ok) throw new Error(r.statusText);  // → "Not sent — tap to retry"
+       return r.json();                           // → { status: 'delivered', ts }
+     },
+     async submitForm(payload) {
+       const paths = [];
+       for (const file of payload.blobs || []) {
+         const { path } = await this.upload(file);
+         paths.push(path);
+       }
+       const r = await fetch('/api/submit', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ ...toSubmission(payload, paths), token })
+       });
+       if (!r.ok) throw new Error((await r.json()).error);
+       return r.json();                           // → { reference, status }
+     },
      subscribe(onMessage) {                  // SSE, WebSocket, or polling
        new EventSource('/api/chat/stream')
          .addEventListener('message', e => onMessage(JSON.parse(e.data)));
      },
-     upload(file) { … },                     // returns { url } for attachments
-     submitForm(payload) { … }               // POST /api/submit
+     upload(file) { … }                      // returns { path } for attachments
    };
 
-   `send` stays the agent's. `POST /api/chat` is both the delivery receipt and
-   the reply: a 200 means the pharmacy has the message and the body says what
-   to answer with. A throw makes the bubble offer "tap to retry", so keep
-   throwing on network failure.
+   `upload` must return a storage path, not a blob URL. `api/submit.ts`
+   requires `file_path` on RX_UPLOAD and stores whatever it is given, so a
+   `blob:` URL would be written to the record and be dead on arrival. The
+   `URL.createObjectURL` stub above must not ship.
 
    Other hooks:
      chat.setPresence('Closed — we reply at 9am', 'away');

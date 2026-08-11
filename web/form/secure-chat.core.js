@@ -34,6 +34,19 @@ const COUNTRY = {
   USA:    { platform: 'Paubox', law: 'HIPAA' }
 };
 
+/**
+ * Ten digits, which is what `requests.patient_phone` stores. A leading country
+ * code is dropped rather than rejected — people write their own number as
+ * "+1 416 555 0100" and being told that's invalid is the form's fault, not
+ * theirs. Returns null if it can't be read as a North American number.
+ */
+function tenDigits(value) {
+  const d = String(value ?? '').replace(/\D/g, '');
+  if (d.length === 10) return d;
+  if (d.length === 11 && d[0] === '1') return d.slice(1);
+  return null;
+}
+
 /* ── Attachments ───────────────────────────────────────────────────── */
 const MAX_FILES = 5;
 const MAX_BYTES = 10 * 1024 * 1024;                       // 10 MB per file
@@ -237,9 +250,26 @@ class SecureChat {
   setProfile(profile) {
     this.profile = profile;
     for (const m of this.messages) {
-      if (m.kind === 'form' && !m.submitted) this.forms.delete(m.id);
+      if (m.kind === 'form' && !m.submitted) { this.seedIdentity(m); this.forms.delete(m.id); }
     }
     this.render();
+  }
+
+  /**
+   * Fills a form's identity answers from the signed-in patient's record, so they
+   * don't retype what the pharmacy already holds. Only ever fills a blank — a
+   * value the patient typed, or deliberately cleared, is theirs.
+   *
+   * Identity only. Consent and any clinical answer are never seeded: consent
+   * belongs to one submission and needs its own timestamp.
+   */
+  seedIdentity(m) {
+    const p = this.profile;
+    if (!p || p.guest) return;
+    const known = { fullName: p.name, phone: p.phone, dob: p.dob };
+    for (const [key, value] of Object.entries(known)) {
+      if (value && m.values[key] == null) m.values[key] = value;
+    }
   }
 
   setStatus(id, status, ts) {
@@ -693,8 +723,10 @@ class SecureChat {
       return;
     }
 
-    this.messages.push({ id: uid(), kind: 'form', formId, from: 'them', ts: Date.now(),
-                         values: {}, step: 0, consent: false, submitted: false });
+    const card = { id: uid(), kind: 'form', formId, from: 'them', ts: Date.now(),
+                   values: {}, step: 0, consent: false, submitted: false };
+    this.seedIdentity(card);
+    this.messages.push(card);
     this.stick = true;
     this.render();
   }
@@ -1176,6 +1208,10 @@ class SecureChat {
           : `Please enter your ${f.label.toLowerCase()}.`;
       } else if (f.type === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
         problem = 'Please enter an email address we can reach you at.';
+      } else if (f.type === 'tel' && value && !tenDigits(value)) {
+        // api/submit.ts stores exactly ten digits. Catching it here puts the
+        // error on the field instead of after a round trip.
+        problem = 'Please enter a 10 digit mobile number.';
       }
 
       const node = errorNodes.get(f.name);
