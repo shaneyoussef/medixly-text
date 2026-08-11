@@ -26,8 +26,9 @@ cannot submit anything.** Replace both files wholesale; don't merge into them.
 | `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
 | `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | **placeholder** |
 | `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
+| `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision — reply, and the form card to open. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
-| `secure-chat.demo.js` | Stub transport and boot. Replace to go live. | yes |
+| `secure-chat.demo.js` | Stub transport, stub router, boot. Replace to go live. | yes |
 
 ### Features built
 
@@ -40,10 +41,32 @@ assessment — each 3–6 short pages ending in review, consent, submit.
 The service rail and the five form cards are rendered by `core` but defined in
 `forms`, so neither appears until that file lands.
 
+Messages are answered by the agent rather than by a person: it classifies each
+one and opens the matching form card in the thread. Emergencies bypass the
+typing indicator entirely.
+
 ### Load order matters
 
-`core` → `forms` → `auth` → `print` → `demo`. Nothing is referenced at
+`core` → `forms` → `auth` → `agent` → `print` → `demo`. Nothing is referenced at
 evaluation time across files, but `demo` constructs everything.
+
+### The agent answers the messages
+
+`SecureChat` sends what you type and renders what arrives; `MedixlyAgent` is the
+half that decides what arrives. It owns the transport's `send` — `POST /api/chat`
+is both the delivery receipt and the reply, so a 200 means the pharmacy has the
+message and the body says what to answer with. Attachments and form submission
+stay with the rest of the transport.
+
+Reply copy, the intent → form map, the emergency tripwire and the two-strikes
+rule are all server-side in `api/agent.ts`, because SMS runs the same code. Do
+not add reply text to the browser: two copies is how the two channels drift
+apart. See [`../docs/AGENT.md`](../docs/AGENT.md).
+
+`secure-chat.demo.js` currently points the agent at a keyword stub, so a deploy
+preview shows the routing without a server. It is not the classifier and its
+copy is not the agent's copy — both facts are shouted in a `console.warn`, the
+same way the placeholder files are. Drop the `route` option to go live.
 
 ---
 
@@ -147,6 +170,14 @@ system answers the substantive part of any patient request.
    delivered → read. Re-run this against the real `forms` and `print` once they
    land — that is the check that counts.
 
+   The agent wiring was checked the same way, against the stub router: sign-in →
+   send → reply in the thread, with `requestForm` called with `transfer`,
+   `refill`, `upload` and `ailment` for those four intents and not called for
+   `PHARMACIST_CHAT` or `OTC_ORDER`. Two `UNCLEAR` turns in a row produced the
+   question and then the handoff, and an emergency message was answered inside
+   900ms with no typing pause. The cards themselves still can't render, so
+   `requestForm` was observed rather than seen — that part re-runs with `forms`.
+
 2. ~~**`SecureChat.prototype.setProfile(profile)`** in core~~ Done. Stores the
    profile and drops any unsubmitted form card from the cache so it rebuilds.
    Submitted cards are receipts and are left alone. Nothing carries consent
@@ -170,8 +201,13 @@ system answers the substantive part of any patient request.
    `secure-chat.auth.js` footer are all still outstanding server work.
 
 6. **Server side** under `api/` — extend what's there, match its conventions.
-   Auth contract endpoints plus `POST /api/chat/send`, `GET /api/chat/stream`
-   (SSE), `POST /api/chat/upload`, `POST /api/forms/:id/sheet`, and
+   `POST /api/chat` is written (`api/chat.ts`) and takes the place of
+   `/api/chat/send`: it classifies, replies, and is the delivery receipt. It is
+   not deployed, does not persist the thread, has no rate limit, and its
+   `escalate` flag has nowhere to land — see the footer of that file.
+
+   Still to build: the auth contract endpoints, `GET /api/chat/stream` (SSE),
+   `POST /api/chat/upload`, `POST /api/forms/:id/sheet`, and
    `GET /api/patients/:id/export`. Apply the six numbered rules in the
    `secure-chat.auth.js` footer — security requirements, not suggestions.
 
@@ -212,6 +248,11 @@ Healthcare, not a generic object store. The `URL.createObjectURL` stub in
 
 **Vaccine inventory** is hardcoded in `secure-chat.forms.js`. It belongs to the
 pharmacist dashboard.
+
+**No intent reaches the `vaccine` card.** The classifier has six intents and none
+of them is vaccine booking, so that form is only reachable from the service rail
+— the agent will never open it. Whether vaccines are a seventh intent is a
+decision for the pharmacy, not one to guess at.
 
 **Delivery method casing.** The spec writes "Store Pickup" / "Local Delivery";
 the design system mandates sentence case, so they render as "Store pickup" /

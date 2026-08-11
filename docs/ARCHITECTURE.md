@@ -13,13 +13,21 @@ Transport adapter
 API  [ca-central-1]
     |
     v
+Emergency tripwire -> deterministic, runs before the classifier
+    |
+    v
 Classifier -> { intent, confidence, contains_health_details }
     |
     v
-Link service -> tokenized short URL (72h expiry)
+Agent -> { reply, form, escalate }
+    |
+    v
+Link service -> tokenized short URL (72h expiry)   [SMS only]
     |
     v
 Reply to patient
+    |  SMS: reply text plus the link
+    |  Web: reply text plus the form card, opened in the thread
     |
     v
 Patient opens Medixly form (HTTPS) -> submits PHI + consent
@@ -38,6 +46,12 @@ never knows whether the trigger was SMS, web chat, or an agent API call. This is
 what makes the channel swappable, and what makes an agent-callable endpoint a
 week of work later instead of a rewrite.
 
+`api/agent.ts` is that layer's front half, and it takes a `channel` for the two
+places the channels genuinely differ: SMS gets a tokenized link where web chat
+gets a form card opened in the thread, and the `RX_UPLOAD` reply has to explain
+on SMS that a texted photo won't arrive. Everything else about a decision is the
+same on both. See [`AGENT.md`](AGENT.md).
+
 The six intents are already a tool schema. The form fields are already input
 schemas. When patients' own AI assistants start making these requests, that
 mapping is the product.
@@ -49,10 +63,11 @@ medixly-text/
 |- api/
 |  |- webhook.ts        # Twilio inbound, signature check, rate limit
 |  |- classify.ts       # intent classification
-|  |- reply.ts          # copy templates per intent
+|  |- agent.ts          # decision layer: emergency tripwire, reply copy, routing
+|  |- chat.ts           # POST /api/chat — the web chat adapter
 |  \- links.ts          # tokenized short-link generation
 |- web/
-|  \- chat.html         # web chat adapter (also a real site widget)
+|  \- form/             # web chat client (also a real site widget)
 |- forms/
 |  |- transfer          # build first — the acquisition intent
 |  |- refill / upload

@@ -18,7 +18,16 @@ The model returns JSON only — no prose, no markdown fences:
 - `contains_health_details: true` -> flag the message for shortened retention and
   make sure the reply doesn't echo any of it back.
 
-See `api/classify.ts` for the live system prompt and the validation logic.
+See `api/classify.ts` for the live system prompt and the validation logic, and
+`api/agent.ts` for the code that applies the three rules above.
+
+### The emergency convention is not a usable signal
+
+The prompt returns `PHARMACIST_CHAT` at confidence 1.0 for an emergency, but an
+ordinary confident message returns 1.0 too, so nothing downstream can tell them
+apart. Emergencies are caught by a deterministic tripwire in `api/agent.ts` that
+runs *before* the model is called — "call 911" must not depend on an API being
+up. The prompt rule stays as a second line, not as the mechanism.
 
 ## What "good" means here
 
@@ -41,11 +50,19 @@ problem rather than an accuracy problem. The harness reports it separately.
 
 ## Reply templates
 
-Each intent maps to a short message with a tokenized link. Keep replies under two
-SMS segments (~300 chars) to control cost.
+They live in `api/agent.ts`, with the routing rules that pick between them — see
+[`AGENT.md`](AGENT.md). Three constraints on them belong here, next to the
+classifier they consume:
+
+- Under two SMS segments (~300 chars), to control cost. Asserted in
+  `test/agent.ts`.
+- No reply ever contains health details. Replies are a function of the *intent*,
+  never of the message, which is what makes that structurally true rather than a
+  thing to remember. Also asserted.
+- `RX_UPLOAD` on SMS must say explicitly not to text photos — MMS is disabled, so
+  the patient needs to know why their picture didn't send. On web chat photos are
+  fine, so that channel's copy doesn't carry the warning.
 
 First-time senders get the consent and not-secure disclosure before anything else.
-No reply ever contains health details.
-
-`RX_UPLOAD` replies must say explicitly not to text photos — MMS is disabled, so
-the patient needs to know why their picture didn't send.
+On web chat the standing notice and trust badge in the chat UI carry it; on SMS it
+is still to build.

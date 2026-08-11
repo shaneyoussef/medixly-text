@@ -20,8 +20,8 @@
   Every value comes from a design-system token — no raw hex, no off-scale
   sizes. Wiring instructions are at the bottom of secure-chat.demo.js.
 
-  Script order matters: core → forms → auth → print → demo. Nothing is
-  referenced at evaluation time across files, but `demo` constructs
+  Script order matters: core → forms → auth → agent → print → demo. Nothing
+  is referenced at evaluation time across files, but `demo` constructs
   everything, so it goes last.
 
   The sign-in gate is not in this markup — `AuthGate` builds it and appends
@@ -160,6 +160,7 @@
 <script src="secure-chat.core.js"></script>
 <script src="secure-chat.forms.js"></script>
 <script src="secure-chat.auth.js"></script>
+<script src="secure-chat.agent.js"></script>
 <script src="secure-chat.print.js"></script>
 <script src="secure-chat.demo.js"></script>
 </body>

@@ -6,6 +6,10 @@ A patient texts the pharmacy's number. An AI agent classifies the request and re
 with a secure link to the matching Medixly form. **SMS is the front door only** — all
 protected health information (PHI) is collected on encrypted, Canadian-hosted forms.
 
+The agent routes; it does not converse. It never asks for symptoms or medication
+names, never answers a clinical question, and never repeats health details back —
+see [`docs/AGENT.md`](docs/AGENT.md).
+
 ## The rule everything else depends on
 
 > No PHI ever travels over SMS. The text thread contains intent and links, nothing more.
@@ -67,6 +71,7 @@ Treat it as one row, not as multi-tenancy.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — flow, modules, data model
 - [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md) — PHIPA/PIPEDA controls checklist
 - [`docs/CLASSIFIER.md`](docs/CLASSIFIER.md) — system prompt and output contract
+- [`docs/AGENT.md`](docs/AGENT.md) — what the system does with a classification
 - [`docs/PIA.md`](docs/PIA.md) — privacy impact assessment (draft, pre-pilot)
 - [`docs/privacy-documents.md`](docs/privacy-documents.md) — the four documents PHIPA requires of a custodian
 - [`docs/VOICE.md`](docs/VOICE.md) — voice transfer flow
@@ -77,10 +82,14 @@ Treat it as one row, not as multi-tenancy.
 
 Pre-pilot, and not approved for real patient data — see [`docs/PIA.md`](docs/PIA.md) §10.
 
-Written but not yet run end to end: the classifier and its test set, the
-submission endpoint and database schema, the staff queue page, and the patient
-secure chat client. Nothing has been deployed to Canadian infrastructure, which
-Phase 5 requires before the first real patient.
+Written but not yet run end to end: the classifier and its test set, the agent
+that routes on it, the submission endpoint and database schema, the staff queue
+page, and the patient secure chat client. Nothing has been deployed to Canadian
+infrastructure, which Phase 5 requires before the first real patient.
+
+The chat client's agent wiring works in a browser against a keyword stub —
+`POST /api/chat` has not been deployed, so no message has been through the real
+classifier yet.
 
 ---
 

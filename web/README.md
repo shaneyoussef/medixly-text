@@ -16,6 +16,12 @@ advertised; `queue/` must never be.
 `secure-chat.print.js` are placeholders, so there is no service rail, no form
 card and no consent block. See [`HANDOFF.md`](HANDOFF.md).
 
+Messages are answered by the agent (`secure-chat.agent.js` → `POST /api/chat`),
+which classifies each one and opens the matching form card. That endpoint isn't
+deployed, so the page currently routes against a keyword stub in
+`secure-chat.demo.js` — it shows the behaviour and demonstrates nothing about
+classification. See [`../docs/AGENT.md`](../docs/AGENT.md).
+
 Never set a publish directory to `web/` itself. That would serve `queue/` from
 the public site.
 
@@ -34,5 +40,8 @@ Pushing to `main` redeploys both.
 ## Before real patients
 
 - Replace the shared staff key with per-person authentication.
-- Add rate limiting to the `submit` endpoint.
+- Add rate limiting to the `submit` and `chat` endpoints. `chat` spends money on
+  every call.
 - Link the privacy notice from the form footer.
+- Give an escalated chat turn somewhere to land. `POST /api/chat` returns
+  `escalate` and nothing reads it.

@@ -15,7 +15,13 @@ Toll-free verification is mandatory: unverified numbers are blocked outright.
 Missing business registration details is the most common rejection reason.
 
 ## Phase 1 — Prove the loop without a number
-- [ ] Web chat page running the real classifier and real reply logic
+- [x] Reply logic — `api/agent.ts`, shared by web chat and SMS
+- [x] Chat page wired to it — `MedixlyAgent` posts to `POST /api/chat`
+- [ ] Deploy `POST /api/chat` so the real classifier is in the loop
+      (it runs against a keyword stub today, see `docs/AGENT.md`)
+- [ ] Somewhere for an escalated turn to land — `escalate` currently stops at
+      the browser
+- [ ] Rate limit the chat endpoint before it is reachable from the internet
 - [ ] Test with fake patient data only
 - [ ] Watch a real person use it before building anything else
 
@@ -26,6 +32,7 @@ This becomes a permanent chat widget on the pharmacy site, not a throwaway rig.
 - [ ] Review every miss by hand
 - [ ] Tune the confidence threshold
 - [ ] Target: zero unsafe misses (clinical requests routed to self-serve forms)
+- [ ] Pharmacy sign-off on the emergency tripwire list in `api/agent.ts`
 
 Raw accuracy is the wrong target. A refill that lands on PHARMACIST_CHAT is fine.
 A clinical concern that lands on an OTC form is not.
