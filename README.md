@@ -91,7 +91,8 @@ Plus an in-chat shop: product cards from Shopify, a basket, and checkout without
 leaving the page.
 
 Written but not yet run against a server: the submission endpoint, the classifier
-and its test set, the routing agent, and the staff queue page. Nothing has been
+and its test set, the routing agent, patient SMS notifications, and the staff
+queue page. Nothing has been
 deployed to Canadian infrastructure, which Phase 5 requires before the first real
 patient.
 

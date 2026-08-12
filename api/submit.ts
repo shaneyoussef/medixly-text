@@ -7,6 +7,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import { notify as sendSms, twilio, type Event } from "./notify.js";
 
 const db = createClient(
   process.env.SUPABASE_URL!,
@@ -116,9 +117,10 @@ export async function POST(req: Request) {
       action: "created", detail: { intent, channel: body.channel ?? "web" },
     });
 
-    // Notification is fire-and-forget: a mail outage must not cost us the
-    // request. The queue is the source of truth, email is the nudge.
+    // Notifications are fire-and-forget: an outage must not cost us the
+    // request. The queue is the source of truth; mail and SMS are nudges.
     notify(pharmacy_id, ref, intent, name, form.urgent).catch(console.error);
+    textPatient(pharmacy_id, phone, data.id, ref).catch(console.error);
 
     return json({ reference: ref, status: "received" }, 201);
 
@@ -145,6 +147,67 @@ async function resolvePharmacy(token?: string, fallback?: string) {
     throw new BadRequest("token", "This link has expired — text us and we'll send a new one");
   }
   return data.pharmacy_id;
+}
+
+/**
+ * Tell the patient we have their request.
+ *
+ * Two sends at most: the first-contact disclosure if this number has never
+ * heard from us, then the receipt. Both are content-free — `api/notify.ts`
+ * templates cannot carry a drug, a condition or anything from `payload`, and
+ * `test/notify.ts` proves it.
+ *
+ * The intent is deliberately not passed. "We've got your refill request" would
+ * put the kind of care on a lock screen, which is exactly what
+ * docs/COMPLIANCE.md's no-PHI-over-SMS rule exists to prevent.
+ */
+async function textPatient(
+  pharmacy_id: string, phone: string, request_id: string, reference: string,
+) {
+  const { data: pharmacy } = await db
+    .from("pharmacies").select("name").eq("id", pharmacy_id).single();
+  if (!pharmacy) return;
+
+  // Consent and opt-out live on the phone number, not the request — saying STOP
+  // once has to silence every future request too.
+  const { data: existing } = await db
+    .from("sms_contacts")
+    .select("phone, opted_out, consent_at")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  const contact = {
+    phone,
+    optedOut: existing?.opted_out === true,
+    consentAt: existing?.consent_at ?? null,
+  };
+  if (contact.optedOut) return;
+
+  const sender = twilio();
+  const ctx = {
+    pharmacy: pharmacy.name,
+    reference,
+    link: process.env.CHAT_URL ?? "",
+  };
+
+  const log = (event: Event, outcome: string, provider_id?: string) =>
+    db.from("sms_log").insert({
+      pharmacy_id, phone, request_id, event, outcome, provider_id,
+    });
+
+  // First contact gets the disclosure before anything else, per the controls
+  // checklist in docs/COMPLIANCE.md.
+  if (!contact.consentAt) {
+    const first = await sendSms(contact, "consent", ctx, sender);
+    await log("consent", first.sent ? "sent" : first.reason ?? "failed");
+    if (!first.sent) return;                  // don't stack a second text on a failure
+    await db.from("sms_contacts").upsert({
+      phone, pharmacy_id, consent_at: new Date().toISOString(),
+    });
+  }
+
+  const receipt = await sendSms(contact, "received", ctx, sender);
+  await log("received", receipt.sent ? "sent" : receipt.reason ?? "failed");
 }
 
 /**

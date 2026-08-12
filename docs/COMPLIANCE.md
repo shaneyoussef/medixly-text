@@ -15,13 +15,19 @@ health information this holds are not parties to that simplification.
 
 ## Controls checklist
 
-- [ ] **First-contact consent.** Automatic reply on a patient's first message:
-      messages are not secure, don't text health details, reply YES to continue,
-      STOP to opt out. Consent timestamp logged.
+- [x] **First-contact consent.** Built — `api/notify.ts` sends the `consent`
+      template before any other text, and `api/submit.ts` stamps
+      `sms_contacts.consent_at` only once it has gone out. Not yet *verified*
+      against a real carrier; nothing can send until toll-free verification
+      clears.
 - [ ] **No PHI over SMS.** The agent never asks for medication names, symptoms,
       health card numbers, or diagnoses by text.
-- [ ] **No PHI echo.** If a patient volunteers health information, the reply never
-      repeats it back, and the message body isn't retained past the audit window.
+- [x] **No PHI echo.** Reply copy is a template table keyed on intent
+      (`api/agent.ts`), so a reply is never a function of the message. SMS
+      notifications go further: `api/notify.ts` templates accept only a pharmacy
+      name, a reference and a link, and `test/notify.ts` asserts that no drug,
+      condition, dose, prescriber or patient name can appear in any of them.
+      Message retention is still unscheduled.
 - [ ] **MMS disabled** so prescription photos can't land in US storage.
 - [ ] **Data residency.** All PHI storage and processing in Canadian regions
       (`ca-central-1`). SMS transport is treated as untrusted infrastructure.
@@ -60,7 +66,21 @@ if it ever stops being true, the compliance posture breaks.
 **Anthropic API** — the classifier sees only the raw inbound text. By design that
 text shouldn't contain PHI, but patients don't read disclaimers, so treat the
 classifier as a system that may incidentally see health info and document it as a
-subprocessor accordingly.
+subprocessor accordingly. **On web chat this reasoning inverts** — that channel is
+where patients are invited to describe symptoms — see the security section of
+docs/AGENT.md.
+
+**Patient SMS notifications** — `api/notify.ts`. Five templates, all
+content-free: a notification says the pharmacy has news and where to read it,
+never what about. Opt-out is checked before a message is even composed, and it
+lives on the phone number rather than the request, so one STOP silences every
+future request too. The log in `db/sms.sql` holds a template name and an outcome,
+never a body.
+
+The one disclosure this cannot avoid: a text from a pharmacy tells anyone who
+sees the lock screen that the recipient is a patient of it, and docs/PIA.md §3 is
+clear that the fact of receiving care is itself PHI. Texting a patient accepts
+that; the templates refuse everything beyond it.
 
 **Twilio AI Assistants** — not used, deliberately. It retains conversation history
 and builds customer profiles on US infrastructure with an LLM subprocessor we

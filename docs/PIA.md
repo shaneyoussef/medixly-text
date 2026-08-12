@@ -138,6 +138,11 @@ for the image in particular.
 
 Reference code, request status, staff notes, timestamps, audit log entries.
 
+SMS notifications add two records, both metadata: `sms_contacts` (phone number,
+consent timestamp, opt-out state — the consent record, which outlives any single
+request) and `sms_log` (which template went out, when, and whether it sent). The
+log never holds a message body.
+
 ---
 
 ## 5. Data flows
@@ -238,7 +243,7 @@ agreements with the pharmacy and with subprocessors.
 | Netlify | Static page hosting | US CDN | None stored; serves HTML only. Request metadata (IP, user agent) is visible to the CDN |
 | Resend | Notification email | US | Patient first name only |
 | Anthropic | Intent classification (not yet in production path) | US | Raw inbound message text when SMS launches |
-| Twilio | SMS and voice (not yet live) | US routing | Message content — hence the no-PHI-in-SMS rule |
+| Twilio | Patient SMS notifications | US routing | Phone number, and the notification text — which is content-free by construction: `api/notify.ts` templates cannot carry a drug, condition, dose or prescriber, and `test/notify.ts` asserts it |
 | Shopify | Over-the-counter orders and payment, in-chat | Canadian company, hosted largely outside Canada | Name, contact and delivery address, and which health products were bought. **No clinical context** — no order notes, tags or line attributes naming a condition |
 
 PIPEDA permits cross-border transfer where comparable protection applies and
@@ -294,6 +299,8 @@ rather than a feature.
 | 15 | Minor ailment red-flag screening questions are not loaded, so the form cannot establish whether a pharmacist may prescribe | **High** | Open. Needs the pharmacy's clinical protocol. Blocks that form. |
 | 16 | Shopify holds order records that may be low-sensitivity PHI, and hosts largely outside Canada — reopening the residency question §5 closed | **High** | Open. Request Shopify's DPA and disclose it in the privacy notice. |
 | 17 | Products that may not lawfully be sold from an unattended cart (NAPRA Schedule II/III) could be exposed in the chat | **High** | Mitigated by an allowlist collection the pharmacist curates — but the collection does not exist yet, so nothing is sellable until they build it. Needs pharmacist sign-off. |
+| 19 | A pharmacy SMS on a lock screen reveals that the recipient is a patient — PIA §3 treats the fact of care as PHI | Low | Accepted and unavoidable if patients are texted at all. Mitigated to the floor: content-free templates, and the first text discloses that SMS isn't secure and how to opt out. |
+| 20 | STOP is honoured only by Twilio's carrier-level opt-out until the inbound webhook exists | Medium | Open. `sms_contacts.opted_out` is written and checked, but nothing writes it from an inbound text yet. |
 | 18 | An automated reply could recommend a product for a symptom, which is clinical advice | Medium | Mitigated — a shopping message flagged `contains_health_details` routes to a pharmacist and returns no product. Asserted in `test/agent.ts`. Depends on PHI-detection accuracy; see docs/SHOP.md. |
 | 11 | View bypassing row-level security across pharmacies | — | **Closed** — fixed during this assessment. |
 | 12 | Data residency | **High** | **Reopened.** Request records stay in `ca-central-1`, but the classifier (Anthropic) and the shop (Shopify) both process outside it. See risks 16 and the security section of docs/AGENT.md. |

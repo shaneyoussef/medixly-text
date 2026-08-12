@@ -43,6 +43,11 @@ A clinical concern that lands on an OTC form is not.
 - [ ] `sendMail()` is a stub that throws — wire Hushmail or SES
 - [ ] Normalise phone numbers in `api/submit.ts`; it rejects "+1 416 555 0100"
 - [ ] Simple queue page to view and mark requests done
+- [x] Patient SMS notifications — `api/notify.ts`, content-free templates
+- [ ] Toll-free verification, without which no SMS sends at all
+- [ ] Inbound webhook so STOP writes `sms_contacts.opted_out` ourselves rather
+      than relying only on Twilio's carrier-level opt-out
+- [ ] Run `db/sms.sql` against the live project
 - [ ] Privacy officer sign-off on the consent block
 - [ ] Red-flag screening questions from the pharmacy's clinical protocol,
       before the assessment form is exposed to anyone real
