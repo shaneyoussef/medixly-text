@@ -90,8 +90,13 @@ paginated, validated, and reconciled against the fields `api/submit.ts` stores.
 Plus an in-chat shop: product cards from Shopify, a basket, and checkout without
 leaving the page.
 
+Patients reach it through a sign-in gate: sign up or log in with an email and
+password, continue with Google, take a texted code, use a passkey, or carry on as
+a guest with no message history.
+
 Written but not yet run against a server: the submission endpoint, the classifier
-and its test set, the routing agent, patient SMS notifications, and the staff
+and its test set, the routing agent, patient SMS notifications, every auth
+endpoint behind that gate, and the staff
 queue page. Nothing has been
 deployed to Canadian infrastructure, which Phase 5 requires before the first real
 patient.

@@ -18,6 +18,11 @@ Missing business registration details is the most common rejection reason.
 - [x] Chat page with a working service rail and five submittable forms
 - [x] Client reconciled against `api/submit.ts` — every field maps to a key the
       server stores
+- [x] Sign-up and log-in screens — email and password, Google, a texted code,
+      passkeys, or guest
+- [ ] Auth server half: the twelve numbered rules at the bottom of
+      `web/form/secure-chat.auth.js`. A password is the one credential Medixly
+      stores itself, so rules 7-12 are not optional
 - [ ] Test with fake patient data only
 - [ ] Watch a real person use it before building anything else
 

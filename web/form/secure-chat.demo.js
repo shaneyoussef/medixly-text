@@ -326,9 +326,11 @@ transport.agent.attach(chat, shop);
    A stub `auth` matching the contract at the bottom of secure-chat.auth.js.
 
    Every call resolves in the browser. Nothing is verified, no token is
-   checked, no session survives a reload, and any six digits are accepted.
-   This exercises the screens — it demonstrates nothing about auth. The six
-   numbered rules in that file's footer are all server-side work.
+   checked, no session survives a reload, any six digits are accepted, and
+   the password is not even looked at. This exercises the screens — it
+   demonstrates nothing about auth. The twelve numbered rules in that file's
+   footer are all server-side work, and rules 7 to 12 exist because there
+   are now passwords.
    ─────────────────────────────────────────────────────────────────── */
 
 const demoPatient = {
@@ -347,9 +349,17 @@ const demoAuth = {
   // Return { profile } instead to boot straight into the chat.
   currentSession: () => wait(400, null),
 
-  // Google proves control of an address, not that the person is this patient,
-  // so both it and a verified code route to the link screen.
+  // An email and password prove control of an address, same as Google does —
+  // not that the person is this patient. Every path lands on the link screen.
+  signUp: ({ name, email }) => { console.log('[auth] signup', name, email); return wait(900, { needsLink: true }); },
+  passwordSignIn: ({ email, password }) => password === 'wrongpassword'
+    ? Promise.reject(new Error('rejected, for testing the error path'))
+    : wait(800, { needsLink: true }),
+  requestPasswordReset: ({ email }) => { console.log('[auth] reset link to', email); return wait(700, { ok: true }); },
+
   googleSignIn: () => wait(700, { needsLink: true }),
+  // `appleSignIn` is deliberately absent — the gate hides the button when the
+  // server half doesn't exist, and this is what that looks like.
   requestCode: ({ to }) => { console.log('[auth] code sent to', to); return wait(700, { ok: true }); },
   verifyCode: ({ code }) => code === '000000'
     ? Promise.reject(new Error('rejected code, for testing the error path'))

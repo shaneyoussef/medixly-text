@@ -25,7 +25,7 @@ don't merge into it.
 | `secure-chat.auth.css` | Sign-in gate styling. | yes |
 | `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
 | `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | yes |
-| `secure-chat.auth.js` | `AuthGate`: sign-in, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
+| `secure-chat.auth.js` | `AuthGate`: sign-up, log in, password reset, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
 | `secure-chat.shop.js` | `MedixlyShop`: product search, basket, Shopify checkout. | yes |
 | `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
@@ -227,11 +227,21 @@ system answers the substantive part of any patient request.
    its own consent record with its own timestamp. Not an optimisation for later.
 
 5. ~~**Wire `AuthGate`** in `secure-chat.demo.js`~~ Done, against a stub `auth`
-   implementing all nine contract methods. Verified in Chromium: sign-in →
-   code → wrong code errors → link → chat, and guest hides the transcript.
-   The stub resolves everything in the browser and verifies nothing, so it
-   demonstrates the screens and nothing about auth. The six rules in the
-   `secure-chat.auth.js` footer are all still outstanding server work.
+   implementing every contract method. Verified in Chromium: welcome → log in →
+   wrong password errors → forgot password → sign up → short password rejected →
+   link → chat, plus code → wrong code errors, and guest hides the transcript.
+   The stub resolves everything in the browser and verifies nothing — it accepts
+   any password — so it demonstrates the screens and nothing about auth. The
+   twelve rules in the `secure-chat.auth.js` footer are all outstanding server
+   work; 7 to 12 exist only because there are now passwords.
+
+   Two things about the gate are decisions, not styling. **A password is the
+   one credential we store ourselves**, so it is the one that can leak — the
+   code and passkey paths never had that exposure. And rule 12 is the one that
+   keeps a password from being a downgrade: a password alone must not open a
+   transcript on a new device, exactly as Google and a texted code don't.
+   **Apple sign-in** is offered only when `auth.appleSignIn` exists, so the
+   button stays hidden until someone builds that half.
 
 6. **Server side** under `api/` — extend what's there, match its conventions.
    `POST /api/chat` is written (`api/chat.ts`) and takes the place of
@@ -241,7 +251,7 @@ system answers the substantive part of any patient request.
 
    Still to build: the auth contract endpoints, `GET /api/chat/stream` (SSE),
    `POST /api/chat/upload`, `POST /api/forms/:id/sheet`, and
-   `GET /api/patients/:id/export`. Apply the six numbered rules in the
+   `GET /api/patients/:id/export`. Apply the twelve numbered rules in the
    `secure-chat.auth.js` footer — security requirements, not suggestions.
 
 7. **Generate the print sheet server-side** at submission. A document carrying a

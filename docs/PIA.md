@@ -143,6 +143,27 @@ consent timestamp, opt-out state — the consent record, which outlives any sing
 request) and `sms_log` (which template went out, when, and whether it sent). The
 log never holds a message body.
 
+### Credentials
+
+The sign-in gate accepts a Google or Apple account, an emailed or texted code, a
+passkey, or an email and password. Only the last of those stores a secret here:
+the others leave verification with Google, Apple, the carrier or the device.
+
+| Item | Held | Note |
+|---|---|---|
+| Email address | Yes | Also the account identifier |
+| Password | As an Argon2id hash, never in plaintext, never recoverable | New with the login screen; see risk 21 |
+| Password reset token | Hashed, single use, one hour | Never emailed as a password |
+| Passkey public key and credential ID | Yes | The private key and any biometric stay on the device — Medixly never receives either |
+| Google / Apple subject identifier | Yes | The link between their account and ours. No password crosses over |
+
+None of this is PHI on its own, but all of it opens PHI, so it lives under the
+same retention and audit rules as the records it protects. Two consequences worth
+stating: **whether an address has an account is itself PHI** — it says someone is
+a patient here — so sign-up, login and reset all answer the same way for a known
+and an unknown address; and a password alone is a weaker check than the paths
+beside it, so it does not by itself open a transcript on a new device.
+
 ---
 
 ## 5. Data flows
@@ -301,6 +322,8 @@ rather than a feature.
 | 17 | Products that may not lawfully be sold from an unattended cart (NAPRA Schedule II/III) could be exposed in the chat | **High** | Mitigated by an allowlist collection the pharmacist curates — but the collection does not exist yet, so nothing is sellable until they build it. Needs pharmacist sign-off. |
 | 19 | A pharmacy SMS on a lock screen reveals that the recipient is a patient — PIA §3 treats the fact of care as PHI | Low | Accepted and unavoidable if patients are texted at all. Mitigated to the floor: content-free templates, and the first text discloses that SMS isn't secure and how to opt out. |
 | 20 | STOP is honoured only by Twilio's carrier-level opt-out until the inbound webhook exists | Medium | Open. `sms_contacts.opted_out` is written and checked, but nothing writes it from an inbound text yet. |
+| 21 | Patient passwords are the first credential Medixly stores itself, so the first one that can be stolen in bulk — and a password alone is weaker than the code and passkey paths it sits beside | **High** | Open. Six requirements are written down as rules 7–12 in the footer of `web/form/secure-chat.auth.js`: Argon2id, a breached-password check, per-address *and* per-IP rate limiting with identical responses for an unknown address, single-use hashed reset tokens, session rotation, and — the one that stops a password being a downgrade — no transcript on a new device from a password alone. None is built. |
+| 22 | A login form tells an attacker who is a patient here, and being a pharmacy's patient is itself PHI under §3 | Medium | Mitigated in the client: one message for a wrong address and a wrong password, "if that address has an account" on reset, and no "email already taken" on sign-up. Worthless until the server matches it in wording **and timing** — rule 9. |
 | 18 | An automated reply could recommend a product for a symptom, which is clinical advice | Medium | Mitigated — a shopping message flagged `contains_health_details` routes to a pharmacist and returns no product. Asserted in `test/agent.ts`. Depends on PHI-detection accuracy; see docs/SHOP.md. |
 | 11 | View bypassing row-level security across pharmacies | — | **Closed** — fixed during this assessment. |
 | 12 | Data residency | **High** | **Reopened.** Request records stay in `ca-central-1`, but the classifier (Anthropic) and the shop (Shopify) both process outside it. See risks 16 and the security section of docs/AGENT.md. |

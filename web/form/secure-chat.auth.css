@@ -11,12 +11,51 @@
   background:rgba(255,255,255,.94);border:1px solid var(--border-subtle);
   border-radius:var(--radius-card);box-shadow:var(--shadow-md)}
 .mx-gate__card h2{font-family:var(--font-display);font-weight:var(--weight-semibold);
-  font-size:var(--text-h3);letter-spacing:var(--tracking-tight);line-height:var(--leading-tight);
+  font-size:var(--text-h2);letter-spacing:var(--tracking-tight);line-height:var(--leading-tight);
   color:var(--ink-900);margin:0}
-.mx-gate__blurb{margin:5px 0 14px;font-size:var(--text-sm);
+.mx-gate__blurb{margin:5px 0 var(--space-5);font-size:var(--text-sm);
   line-height:var(--leading-snug);color:var(--text-muted);text-wrap:pretty}
 
-.mx-gate__card .mx-control{margin-bottom:var(--space-3)}
+/* The brand mark on the two front doors. The reference design opens with a
+   logo above the headline; this is that slot, in amber rather than green. */
+.mx-gate__mark{display:flex;align-items:center;justify-content:center;
+  width:var(--space-12);height:var(--space-12);margin-bottom:var(--space-4);
+  border-radius:var(--radius-md);background:var(--surface-accent-soft);
+  border:1px solid var(--border-accent);color:var(--clay-700)}
+.mx-gate__mark .mx-icon{background-color:var(--clay-700)}
+
+/* Fields are labelled here, unlike the old placeholder-only version — a
+   password manager needs a label to fill, and so does a screen reader. */
+.mx-gate__field{margin-bottom:var(--space-4)}
+.mx-gate__field[hidden]{display:none}
+.mx-gate__field .mx-label{margin-bottom:6px;font-size:var(--text-xs);
+  letter-spacing:var(--tracking-wide);text-transform:uppercase;color:var(--text-label);
+  font-weight:var(--weight-semibold)}
+
+.mx-gate__wrap{position:relative}
+.mx-gate__pw{padding-right:var(--space-12)}
+.mx-gate__reveal{position:absolute;top:0;right:0;display:flex;align-items:center;
+  justify-content:center;width:var(--space-12);height:var(--field-height);
+  border:none;background:none;cursor:pointer;color:var(--text-label);
+  border-radius:var(--radius-field);transition:var(--transition-control)}
+.mx-gate__reveal .mx-icon{background-color:var(--ink-400)}
+.mx-gate__reveal:hover .mx-icon{background-color:var(--clay-700)}
+
+/* Right-aligned, on its own line, directly under the password — where the
+   person who just failed to remember it is already looking. */
+.mx-gate__aux{display:flex;justify-content:flex-end;
+  margin:calc(var(--space-2) * -1) 0 var(--space-4)}
+
+.mx-gate__link{padding:0;border:none;background:none;cursor:pointer;
+  font-family:var(--font-display);font-weight:var(--weight-semibold);
+  font-size:var(--text-sm);color:var(--text-link);text-decoration:underline;
+  text-underline-offset:2px;text-decoration-thickness:1px}
+.mx-gate__link:hover{color:var(--text-link-hover)}
+
+.mx-gate__foot{margin:var(--space-4) 0 0;padding-top:var(--space-4);
+  border-top:1px solid var(--border-subtle);text-align:center;
+  font-size:var(--text-sm);color:var(--text-muted)}
+
 .mx-gate__code{font-variant-numeric:tabular-nums;font-size:var(--text-h3);text-align:center;
   letter-spacing:.3em}
 
@@ -46,6 +85,8 @@
   letter-spacing:var(--tracking-wide);text-transform:uppercase;color:var(--text-label)}
 
 .mx-gate__err{margin:0 0 var(--space-3)}
+.mx-gate__note{margin:0 0 var(--space-3);font-size:var(--text-sm);
+  line-height:var(--leading-snug);color:var(--success-600)}
 .mx-gate__card .mx-trust{padding-top:var(--space-4)}
 .mx-gate__card .mx-typing{margin:0 auto}
 .mx-gate__card .mx-hint{margin-top:calc(var(--space-2) * -1);margin-bottom:var(--space-4);
