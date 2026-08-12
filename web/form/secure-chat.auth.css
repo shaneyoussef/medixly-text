@@ -4,27 +4,27 @@
    ─────────────────────────────────────────────────────────────────── */
 
 .mx-gate{position:absolute;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;
-  padding:var(--space-4);background:var(--paper-100);overflow-y:auto}
+  padding:var(--space-6);background:var(--surface-glow);overflow-y:auto}
 .mx-gate[hidden]{display:none}
 
-.mx-gate__card{width:100%;max-width:var(--container-narrow);padding:var(--space-6);
-  background:var(--surface-card);border:1px solid var(--border-subtle);
-  border-radius:var(--radius-card);box-shadow:var(--shadow-sm)}
+.mx-gate__card{width:100%;max-width:var(--container-narrow);padding:var(--space-5);
+  background:rgba(255,255,255,.94);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-card);box-shadow:var(--shadow-md)}
 .mx-gate__card h2{font-family:var(--font-display);font-weight:var(--weight-semibold);
-  font-size:var(--text-h2);letter-spacing:var(--tracking-tight);line-height:var(--leading-tight);
+  font-size:var(--text-h3);letter-spacing:var(--tracking-tight);line-height:var(--leading-tight);
   color:var(--ink-900);margin:0}
-.mx-gate__blurb{margin:var(--space-3) 0 var(--space-6);font-size:var(--text-sm);
-  line-height:var(--leading-normal);color:var(--text-muted)}
+.mx-gate__blurb{margin:5px 0 14px;font-size:var(--text-sm);
+  line-height:var(--leading-snug);color:var(--text-muted);text-wrap:pretty}
 
 .mx-gate__card .mx-control{margin-bottom:var(--space-3)}
-.mx-gate__code{font-family:var(--font-mono);font-size:var(--text-h3);text-align:center;
-  letter-spacing:var(--tracking-caps)}
+.mx-gate__code{font-variant-numeric:tabular-nums;font-size:var(--text-h3);text-align:center;
+  letter-spacing:.3em}
 
 .mx-gate__btn{display:flex;align-items:center;justify-content:center;gap:var(--space-2);
-  width:100%;min-height:var(--field-height);margin-bottom:var(--space-3);cursor:pointer;
+  width:100%;min-height:var(--field-height);margin-bottom:var(--space-2);cursor:pointer;
   border-radius:var(--radius-button);transition:var(--transition-control);
-  font-family:var(--font-display);font-weight:var(--weight-semibold);font-size:var(--text-base);
-  letter-spacing:var(--tracking-tight)}
+  font-family:var(--font-display);font-weight:var(--weight-medium);font-size:.875rem;
+  letter-spacing:var(--tracking-normal)}
 
 .mx-gate__btn--primary{border:none;background:var(--action-primary);color:var(--text-on-accent);
   box-shadow:var(--shadow-cut)}
@@ -32,17 +32,18 @@
 .mx-gate__btn--primary:active{background:var(--action-primary-active);
   box-shadow:var(--shadow-press);transform:translateY(1px)}
 
-.mx-gate__btn--outline{border:1.5px solid var(--border-default);background:var(--surface-card);
-  color:var(--ink-800)}
-.mx-gate__btn--outline:hover{background:var(--paper-200)}
+.mx-gate__btn--outline{border:1px solid var(--border-accent-strong);
+  background:rgba(247,220,184,.4);color:var(--clay-800)}
+.mx-gate__btn--outline:hover{background:var(--surface-accent-hover)}
 
-.mx-gate__btn--ghost{border:none;background:transparent;color:var(--ink-800)}
-.mx-gate__btn--ghost:hover{background:var(--paper-200)}
+.mx-gate__btn--ghost{border:1px solid var(--border-default);background:var(--surface-quiet);
+  color:var(--text-muted);font-weight:var(--weight-regular)}
+.mx-gate__btn--ghost:hover{background:#fff}
 
 .mx-gate__rule{display:flex;align-items:center;gap:var(--space-3);margin:var(--space-4) 0}
-.mx-gate__rule::before,.mx-gate__rule::after{content:"";flex:1;height:1px;background:var(--border-subtle)}
-.mx-gate__rule span{font-family:var(--font-mono);font-size:var(--text-xs);
-  letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--paper-600)}
+.mx-gate__rule::before,.mx-gate__rule::after{content:"";flex:1;height:1px;background:rgba(26,34,37,.1)}
+.mx-gate__rule span{font-weight:var(--weight-medium);font-size:var(--text-xs);
+  letter-spacing:var(--tracking-wide);text-transform:uppercase;color:var(--text-label)}
 
 .mx-gate__err{margin:0 0 var(--space-3)}
 .mx-gate__card .mx-trust{padding-top:var(--space-4)}
@@ -50,7 +51,6 @@
 .mx-gate__card .mx-hint{margin-top:calc(var(--space-2) * -1);margin-bottom:var(--space-4);
   text-align:center}
 
-/* Guests get intake only — no transcript, no history-bearing chrome. */
 /* Guest is intake only: no message history, but the cards they came to use
    have to stay. Form and shop cards are exempt — hiding those would leave a
    guest with a rail that opens nothing. Same rule during checkout, where the

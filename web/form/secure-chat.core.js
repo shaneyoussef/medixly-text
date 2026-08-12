@@ -141,7 +141,11 @@ class SecureChat {
     const o = this.opts;
     if (o.pharmacyName) {
       this.$('name').textContent = o.pharmacyName;
-      this.$('avatar').textContent = o.pharmacyName.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+      // The header has no avatar in the current design; keep this tolerant so
+      // a shell that does still gets its initials.
+      const avatar = this.$('avatar');
+      if (avatar) avatar.textContent =
+        o.pharmacyName.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
       this.$('log').setAttribute('aria-label', `Conversation with ${o.pharmacyName}`);
     }
     if (o.presence) this.setPresence(o.presence);
