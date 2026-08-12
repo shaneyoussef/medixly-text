@@ -30,10 +30,24 @@ don't merge into it.
 | `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
 | `secure-chat.demo.js` | Stub transport, the submission mapper, boot. Replace the transport to go live; keep the mapper. | yes |
+| `img/pharmacist.png` | The illustration on the sign-up and log-in screens. Recoloured to the palette before it was committed — see below. | yes |
 
 The agent routes and a pharmacist answers whatever it hands over. It never
 suggests a product for a symptom — see [`../docs/AGENT.md`](../docs/AGENT.md)
 and [`../docs/SHOP.md`](../docs/SHOP.md).
+
+`img/` is the only asset directory, and `netlify.toml` publishes `web/form`, so
+`img/pharmacist.png` is served from `/img/`. The committed file is not the
+original artwork: it arrived as black strokes on opaque white, and both of those
+are colours the palette doesn't contain, so its ink was remapped to `--ink-700`
+and its fill to `--paper-50` and it was quantised to 64 colours (26 KB). Bake any
+replacement the same way rather than reaching for a CSS `filter`.
+
+One trap worth naming, because it looks like the obvious approach and isn't: this
+illustration cannot be treated as an alpha mask the way `.mx-icon` treats every
+lucide glyph. Its white fill is opaque and load-bearing — it is what stops the
+shelf showing through the pharmacist's coat — so masking by alpha and tinting
+collapses her into a solid silhouette.
 
 ### Features built
 

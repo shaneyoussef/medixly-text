@@ -16,13 +16,41 @@
 .mx-gate__blurb{margin:5px 0 var(--space-5);font-size:var(--text-sm);
   line-height:var(--leading-snug);color:var(--text-muted);text-wrap:pretty}
 
-/* The brand mark on the two front doors. The reference design opens with a
-   logo above the headline; this is that slot, in amber rather than green. */
-.mx-gate__mark{display:flex;align-items:center;justify-content:center;
-  width:var(--space-12);height:var(--space-12);margin-bottom:var(--space-4);
-  border-radius:var(--radius-md);background:var(--surface-accent-soft);
-  border:1px solid var(--border-accent);color:var(--clay-700)}
-.mx-gate__mark .mx-icon{background-color:var(--clay-700)}
+/* The pharmacist, above the headline on both front doors.
+
+   The file is not the original. The drawing came as black strokes on opaque
+   white, which is two colours the palette doesn't contain — so its ink was
+   remapped to --ink-700 and its fill to --paper-50 before it was committed,
+   and it now sits in the card instead of on top of it. That is baked into the
+   PNG rather than done with a CSS filter: a filter would cost a repaint on a
+   full-card image, and there is only one palette to serve.
+
+   It is a picture, not a mask. The white fill is opaque and load-bearing —
+   it is what stops the shelf behind her showing through her coat — so the
+   .mx-icon trick of masking by alpha and tinting would flatten her into a
+   silhouette. Learned the hard way. */
+.mx-gate__art{display:block;width:auto;height:196px;max-width:100%;
+  margin:0 auto var(--space-5);object-fit:contain}
+
+.mx-gate__art--sm{height:124px;margin-bottom:var(--space-4)}
+
+/* A soft amber halo behind her, lifted from --surface-glow, so she reads as
+   part of the card's light. A sibling layer rather than her own background,
+   which would be clipped to the image box. */
+.mx-gate__card:has(.mx-gate__art){position:relative;isolation:isolate}
+.mx-gate__card:has(.mx-gate__art)::before{content:"";position:absolute;
+  top:0;left:50%;translate:-50% 0;
+  width:min(340px,96%);height:230px;z-index:-1;pointer-events:none;
+  background:radial-gradient(58% 54% at 50% 44%,
+    rgba(226,166,96,.30) 0%, rgba(226,166,96,.11) 44%, rgba(255,253,249,0) 74%)}
+.mx-gate__card:has(.mx-gate__art--sm)::before{height:150px}
+
+/* On a short phone the form matters more than the picture. */
+@media (max-height:720px){
+  .mx-gate__art{height:140px}
+  .mx-gate__art--sm{display:none}
+  .mx-gate__card:has(.mx-gate__art--sm)::before{display:none}
+}
 
 /* Fields are labelled here, unlike the old placeholder-only version — a
    password manager needs a label to fill, and so does a screen reader. */

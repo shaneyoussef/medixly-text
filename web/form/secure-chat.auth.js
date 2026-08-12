@@ -129,16 +129,27 @@ class AuthGate {
 
   /* ── Card parts ──────────────────────────────────────────────── */
 
-  card(title, blurb, withMark) {
+  /**
+   * @param {string} title
+   * @param {string} [blurb]
+   * @param {'hero'|'small'} [art]  the pharmacist illustration, or nothing
+   */
+  card(title, blurb, art) {
     const card = document.createElement('div');
     card.className = 'mx-gate__card';
 
-    if (withMark) {
-      const mark = document.createElement('div');
-      mark.className = 'mx-gate__mark';
-      mark.append(icon('pill'));
-      mark.setAttribute('aria-hidden', 'true');
-      card.append(mark);
+    if (art) {
+      // Decorative, so `alt=""` rather than a description — a screen reader
+      // announcing "pharmacist at a shelf of medicine" before the heading adds
+      // nothing. The ink and paper of the drawing are baked to the palette's
+      // own values; see the note in secure-chat.auth.css.
+      const fig = document.createElement('img');
+      fig.className = 'mx-gate__art' + (art === 'small' ? ' mx-gate__art--sm' : '');
+      fig.src = 'img/pharmacist.png';
+      fig.alt = '';
+      fig.width = 600;
+      fig.height = 568;
+      card.append(fig);
     }
 
     const h = document.createElement('h2');
@@ -360,7 +371,7 @@ class AuthGate {
     const card = this.card(
       `Welcome to ${this.opts.pharmacyName}`,
       'Refills, transfers and a pharmacist you can message. Your conversation contains health information, so we need to know it\u2019s you.',
-      true);
+      'hero');
 
     card.append(this.button('Sign up with email', 'primary', () => this.screen('signup')));
     this.federated(card);
@@ -382,7 +393,7 @@ class AuthGate {
 
   signupScreen() {
     const card = this.card('Create your account',
-      `We\u2019ll use this to reach you about your requests — nothing else.`, true);
+      `We\u2019ll use this to reach you about your requests — nothing else.`, 'small');
 
     const name = this.field(card, 'Full name', { type: 'text', autocomplete: 'name' });
     const email = this.field(card, 'Email address', { type: 'email', autocomplete: 'email', inputMode: 'email' });
@@ -423,7 +434,7 @@ class AuthGate {
   /* ── Front door: been here before ────────────────────────────── */
 
   loginScreen() {
-    const card = this.card('Log in', `Welcome back to ${this.opts.pharmacyName}.`, true);
+    const card = this.card('Log in', `Welcome back to ${this.opts.pharmacyName}.`, 'small');
 
     const email = this.field(card, 'Email address', { type: 'email', autocomplete: 'email', inputMode: 'email' });
     const pw = this.passwordField(card, 'Password', 'current-password');
