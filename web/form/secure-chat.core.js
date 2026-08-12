@@ -150,8 +150,11 @@ class SecureChat {
     }
     if (o.presence) this.setPresence(o.presence);
 
+    // The composer carries no trust line; the gate and the consent page do.
+    // Kept tolerant so a shell that does show one still gets it filled in.
     const c = COUNTRY[o.country] || COUNTRY.Canada;
-    this.$('trust').textContent =
+    const trust = this.$('trust');
+    if (trust) trust.textContent =
       `Your information is transmitted securely via ${c.platform} — ${c.law} compliant`;
 
     const input = this.$('input'), send = this.$('send'), log = this.$('log');

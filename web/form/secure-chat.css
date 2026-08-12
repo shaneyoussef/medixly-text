@@ -1,5 +1,7 @@
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;background:var(--paper-200);display:flex;align-items:center;justify-content:center;min-height:100dvh}
+/* Full bleed. This is a messaging app, not a device mockup — it fills the
+   window on a phone and on a desktop alike, the way a messenger does. */
+body{margin:0;background:var(--surface-page);min-height:100dvh}
 button,textarea{font-family:inherit}
 
 /* ── Icons: Lucide, masked so they inherit currentColor (Icon.jsx) ─── */
@@ -11,16 +13,14 @@ button,textarea{font-family:inherit}
 .mx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* ── Shell ─────────────────────────────────────────────────────────── */
-.mx-chat{position:relative;display:flex;flex-direction:column;width:100%;max-width:390px;height:100dvh;
+.mx-chat{position:relative;display:flex;flex-direction:column;width:100%;height:100dvh;
   background:var(--surface-glow);color:var(--ink-900);overflow:hidden}
 
-/* On a desk the app sits in a device frame: a light rim over a long, soft
-   shadow, which is what gives the warm card something to sit on. */
-@media (min-width:480px) and (min-height:760px){
-  body{padding:var(--space-8)}
-  .mx-chat{height:min(844px, calc(100dvh - var(--space-16)));
-    border-radius:37px;
-    box-shadow:0 0 0 3px rgba(255,255,255,.7), var(--shadow-lg)}
+/* Wide windows get a reading measure so lines don't run the full desktop, but
+   still no frame, no rim, no radius. */
+@media (min-width:560px){
+  .mx-chat{max-width:560px;margin:0 auto;
+    border-left:1px solid var(--border-subtle);border-right:1px solid var(--border-subtle)}
 }
 
 /* Scroll, don't advertise it. */
