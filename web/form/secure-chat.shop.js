@@ -30,6 +30,8 @@ class MedixlyShop {
    */
   constructor(opts = {}) {
     this.endpoint = opts.endpoint ?? '/api/shop';
+    // Needed for the cart permalink the hosted path opens.
+    this.shopDomain = opts.shopDomain ?? null;
     this.chat = opts.chat ?? null;
     this._search = opts.search ?? null;
     this._cart = opts.cart ?? null;
@@ -84,21 +86,40 @@ class MedixlyShop {
   async checkout(lines) {
     if (!lines?.length) return null;
 
+    // The hosted path opens FIRST and synchronously. Safari and iOS discard
+    // the user gesture across an `await`, so opening a tab after the cart
+    // round trip is refused as a pop-up — which is exactly what "your browser
+    // blocked the checkout window" was. A cart permalink needs no API call, so
+    // there is nothing to wait for.
+    const kit = this.peekKit();
+    if (!kit) return this.openHosted(lines);
+
+    // Only the embedded path needs a real cart, and only it puts a payment
+    // surface over this page — so only it hides the transcript.
     const cart = await this.createCart(lines);
     if (!cart?.checkoutUrl) throw new Error('cart has no checkoutUrl');
-
-    // The health transcript is not for a payment surface. AuthGate already
-    // knows how to hide it; borrow that rather than inventing a second way.
     this.chat?.root.classList.add('is-checkout');
 
     try {
-      const kit = await this.loadKit();
-      if (kit) return await this.present(kit, cart);
-      return this.openHosted(cart);
+      return await this.present(kit, cart);
     } catch (err) {
-      console.warn('[MedixlyShop] embedded checkout unavailable, opening hosted', err);
-      return this.openHosted(cart);
+      console.warn('[MedixlyShop] embedded checkout failed, opening hosted', err);
+      this.reveal();
+      return this.openHosted(lines);
     }
+  }
+
+  /**
+   * A Shopify cart permalink: `/cart/{variantId}:{qty},…`. Numeric variant ids
+   * only — the `gid://` form is rejected — so the tail of the GID is what goes
+   * in. It carries nothing but what was bought and how many.
+   */
+  permalink(lines) {
+    if (!this.shopDomain) return null;
+    const parts = lines
+      .map(l => `${String(l.variantId).split('/').pop()}:${l.quantity}`)
+      .filter(part => /^\d+:\d+$/.test(part));
+    return parts.length ? `https://${this.shopDomain}/cart/${parts.join(',')}` : null;
   }
 
   async createCart(lines) {
@@ -120,10 +141,11 @@ class MedixlyShop {
   }
 
   /**
-   * `@shopify/checkout-kit`, if the page has it. Returns null rather than
-   * throwing so the hosted path stays the quiet default.
+   * `@shopify/checkout-kit`, if the page has it. Synchronous on purpose — the
+   * decision has to be made before the first `await`, or the gesture is gone.
+   * Returns null rather than throwing so the hosted path is the quiet default.
    */
-  async loadKit() {
+  peekKit() {
     const kit = window.ShopifyCheckoutKit || window.checkoutKit;
     return kit && typeof kit.present === 'function' ? kit : null;
   }
@@ -139,22 +161,41 @@ class MedixlyShop {
   }
 
   /**
-   * Hosted checkout in a new tab. `noopener` matters: without it the
-   * checkout document gets a handle on this one, which is the last window
-   * that should be reachable from a page holding a health conversation.
+   * Hosted checkout in a new tab, opened on the tap with no await in front of
+   * it.
+   *
+   * An anchor click rather than `window.open`, for two reasons. Browsers treat
+   * a real anchor click inside a gesture as navigation rather than a pop-up, so
+   * it survives where `window.open` gets blocked — notably on iOS. And
+   * `window.open(url, '_blank', 'noopener')` returns null *by specification*,
+   * because noopener means no handle: the old `if (!tab)` check therefore fired
+   * every single time, telling patients their browser had blocked a window that
+   * had in fact opened.
+   *
+   * `rel="noopener noreferrer"` still keeps the checkout document from getting
+   * a handle on this one, which is the last window that should be reachable
+   * from a page holding a health conversation.
+   *
+   * Nothing reports back from another tab, so the thread says what happened and
+   * the basket is left alone until the pharmacy confirms the order.
    */
-  openHosted(cart) {
-    const tab = window.open(cart.checkoutUrl, '_blank', 'noopener,noreferrer');
-    if (!tab) {
-      this.reveal();
-      this.chat?.fail('Your browser blocked the checkout window. Allow pop-ups for this page, then tap Checkout again.');
+  openHosted(lines) {
+    const url = this.permalink(lines);
+    if (!url) {
+      this.chat?.fail('We couldn\u2019t start checkout. Please call the pharmacy and we\u2019ll take the order.');
       return null;
     }
-    // Nothing reports back from another tab, so say what's happening and
-    // leave the basket alone until the pharmacy confirms the order.
-    this.reveal();
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.append(link);
+    link.click();
+    link.remove();
+
     this.chat?.receive({
-      text: 'Checkout is open in a new tab. Come back here when you’re done and we’ll confirm your order.'
+      text: 'Checkout is open in a new tab. Come back here when you\u2019re done and we\u2019ll confirm your order. If nothing opened, allow pop-ups for this page and tap Checkout again.'
     });
     return null;
   }

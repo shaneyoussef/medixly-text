@@ -162,7 +162,11 @@ const stubShop = {
   }
 };
 
-const shop = new MedixlyShop({ search: q => stubShop.search(q), cart: l => stubShop.cart(l) });
+const shop = new MedixlyShop({
+  shopDomain: 'f1u1zc-8t.myshopify.com',
+  search: q => stubShop.search(q),
+  cart: l => stubShop.cart(l)
+});
 
 /* ── Stub router ──────────────────────────────────────────
    Stands in for `POST /api/chat`. Keyword matching, not the classifier,
