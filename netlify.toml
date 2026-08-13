@@ -16,4 +16,21 @@
 [build]
   publish = "web/form"
 
-# No build step. The pages are static and load their assets by relative path.
+# No build step. The pages are static and load their assets by relative path,
+# with no content hash in the filenames — `secure-chat.auth.js` is the same URL
+# on every deploy. That is what makes the header below necessary rather than
+# fussy: without it a phone can keep serving a build from an hour ago, and the
+# person testing sees a screen that no longer exists in the repository. That
+# happened, and it cost a round of "it's still there" / "no it isn't".
+#
+# `no-cache` does not mean "don't store it". It means revalidate before use, so
+# the browser still sends an If-None-Match and still gets a 304 for anything
+# unchanged. The cost is one conditional request per file per load; the benefit
+# is that a deploy is visible on the next page load, always.
+#
+# When the client stops changing daily, the better answer is fingerprinted
+# filenames plus a long max-age — not a longer max-age on these paths.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache"
