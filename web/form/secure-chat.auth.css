@@ -74,15 +74,38 @@
 .mx-gate__aux{display:flex;justify-content:flex-end;
   margin:calc(var(--space-2) * -1) 0 var(--space-4)}
 
-.mx-gate__link{padding:0;border:none;background:none;cursor:pointer;
+.mx-gate__link{display:inline-flex;align-items:center;gap:4px;padding:0;
+  border:none;background:none;cursor:pointer;
   font-family:var(--font-display);font-weight:var(--weight-semibold);
   font-size:var(--text-sm);color:var(--text-link);text-decoration:underline;
   text-underline-offset:2px;text-decoration-thickness:1px}
 .mx-gate__link:hover{color:var(--text-link-hover)}
+.mx-gate__link .mx-icon{background-color:currentColor;text-decoration:none}
 
 .mx-gate__foot{margin:var(--space-4) 0 0;padding-top:var(--space-4);
   border-top:1px solid var(--border-subtle);text-align:center;
   font-size:var(--text-sm);color:var(--text-muted)}
+
+/* Google and Apple share a row: two short labels beside their own marks read
+   faster than two full-width "Continue with ..." bars. With only one wired up
+   the single button just fills the row. */
+.mx-gate__social{display:flex;gap:var(--space-2)}
+.mx-gate__social .mx-gate__btn{flex:1 1 0;min-width:0}
+
+/* Both brands forbid recolouring their mark, so this is the one element in the
+   client that opts out of currentColor. */
+.mx-brand{width:18px;height:18px;flex:0 0 auto}
+
+/* Deliberately not --text-subtle, which the trust line uses. This sentence is
+   the one the patient is being held to, and at #9AA0A6 on white it sits around
+   2.6:1 — under WCAG AA for body text. Legalese is set small; it does not get
+   to be set faint as well. */
+.mx-gate__legal{margin:var(--space-3) 0 0;text-align:center;
+  font-size:var(--text-xs);line-height:var(--leading-snug);color:var(--text-muted);
+  text-wrap:pretty}
+.mx-gate__legal a{color:var(--text-link);text-decoration:underline;
+  text-underline-offset:2px}
+.mx-gate__legal a:hover{color:var(--text-link-hover)}
 
 .mx-gate__code{font-variant-numeric:tabular-nums;font-size:var(--text-h3);text-align:center;
   letter-spacing:.3em}

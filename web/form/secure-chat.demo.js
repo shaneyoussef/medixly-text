@@ -358,8 +358,10 @@ const demoAuth = {
   requestPasswordReset: ({ email }) => { console.log('[auth] reset link to', email); return wait(700, { ok: true }); },
 
   googleSignIn: () => wait(700, { needsLink: true }),
-  // `appleSignIn` is deliberately absent — the gate hides the button when the
-  // server half doesn't exist, and this is what that looks like.
+  // Present so the two-up Google/Apple row renders as designed. It is a stub
+  // like every other method here — the real Apple server half is not built,
+  // and deleting this key is what the gate looks like without one.
+  appleSignIn: () => wait(700, { needsLink: true }),
   requestCode: ({ to }) => { console.log('[auth] code sent to', to); return wait(700, { ok: true }); },
   verifyCode: ({ code }) => code === '000000'
     ? Promise.reject(new Error('rejected code, for testing the error path'))

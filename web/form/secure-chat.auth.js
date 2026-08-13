@@ -24,6 +24,40 @@ const MIN_PASSWORD = 10;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+/* Google and Apple both require their own mark on a sign-in button, and both
+   forbid recolouring it — so these two are the one place in this client where
+   a colour does not come from a token. Built as SVG rather than fetched, since
+   nothing on this page may reach a third-party host: an asset request to
+   Google would tell Google a patient is at a pharmacy's sign-in screen. */
+const BRAND = {
+  google: { box: '0 0 18 18', paths: [
+    ['#4285F4', 'M17.64 9.2045c0-.6381-.0573-1.2518-.1636-1.8409H9v3.4814h4.8436c-.2086 1.125-.8427 2.0782-1.7959 2.7164v2.2581h2.9087c1.7018-1.5668 2.6836-3.874 2.6836-6.615z'],
+    ['#34A853', 'M9 18c2.43 0 4.4673-.806 5.9564-2.1805l-2.9087-2.2581c-.8059.54-1.8368.859-3.0477.859-2.344 0-4.3282-1.5831-5.036-3.7104H.9574v2.3318C2.4382 15.9832 5.4818 18 9 18z'],
+    ['#FBBC05', 'M3.964 10.71c-.18-.54-.2822-1.1168-.2822-1.71s.1023-1.17.2823-1.71V4.9582H.9573A8.9965 8.9965 0 000 9c0 1.4523.3477 2.8268.9573 4.0418L3.964 10.71z'],
+    ['#EA4335', 'M9 3.5795c1.3214 0 2.5077.4541 3.4405 1.346l2.5813-2.5814C13.4632.8918 11.426 0 9 0 5.4818 0 2.4382 2.0168.9573 4.9582L3.964 7.29C4.6718 5.1627 6.6559 3.5795 9 3.5795z']
+  ]},
+  apple: { box: '0 0 24 24', paths: [
+    ['#000', 'M17.05 12.536c-.024-2.51 2.05-3.716 2.143-3.775-1.167-1.706-2.98-1.94-3.622-1.966-1.542-.156-3.01.908-3.79.908-.782 0-1.988-.885-3.268-.861-1.68.025-3.23.977-4.093 2.48-1.745 3.026-.446 7.505 1.253 9.957.83 1.2 1.82 2.548 3.118 2.5 1.25-.05 1.723-.81 3.234-.81 1.51 0 1.937.81 3.26.785 1.346-.025 2.198-1.223 3.02-2.428.952-1.392 1.343-2.74 1.367-2.81-.03-.013-2.62-1.005-2.645-3.99zM14.6 4.9c.69-.837 1.156-2 1.029-3.16-.994.04-2.2.662-2.913 1.498-.64.74-1.2 1.925-1.05 3.06 1.11.086 2.243-.564 2.934-1.398z']
+  ]}
+};
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function brandMark(name) {
+  const spec = BRAND[name];
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'mx-brand');
+  svg.setAttribute('viewBox', spec.box);
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  for (const [fill, d] of spec.paths) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('fill', fill);
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
+}
+
 /** Passkeys need a platform authenticator; hide the offer where there isn't one. */
 async function passkeysAvailable() {
   try {
@@ -113,7 +147,7 @@ class AuthGate {
     const build = {
       loading: () => this.loadingScreen(),
       welcome: () => this.welcomeScreen(),
-      signup:  () => this.signupScreen(),
+      signup:  () => this.signupScreen(data),
       login:   () => this.loginScreen(),
       reset:   () => this.resetScreen(),
       code:    () => this.codeScreen(data),
@@ -168,18 +202,19 @@ class AuthGate {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = `mx-gate__btn mx-gate__btn--${variant}`;
-    if (iconName) b.append(icon(iconName, true));
+    if (iconName) b.append(BRAND[iconName] ? brandMark(iconName) : icon(iconName, true));
     b.append(document.createTextNode(label));
     b.addEventListener('click', onClick);
     return b;
   }
 
   /** A text link, for the switches between screens. */
-  link(label, onClick) {
+  link(label, onClick, arrow) {
     const a = document.createElement('button');
     a.type = 'button';
     a.className = 'mx-gate__link';
-    a.textContent = label;
+    a.append(document.createTextNode(label));
+    if (arrow) a.append(icon('arrow-right', true));
     a.addEventListener('click', onClick);
     return a;
   }
@@ -258,10 +293,10 @@ class AuthGate {
   }
 
   /** The switch at the foot of a card: "Already have an account? Log in". */
-  foot(card, sentence, label, onClick) {
+  foot(card, sentence, label, onClick, arrow) {
     const p = document.createElement('p');
     p.className = 'mx-gate__foot';
-    p.append(document.createTextNode(sentence + ' '), this.link(label, onClick));
+    p.append(document.createTextNode(sentence + ' '), this.link(label, onClick, arrow));
     card.append(p);
     return p;
   }
@@ -325,28 +360,7 @@ class AuthGate {
    *   Enrollment is offered once, after the record link, on passkeyScreen().
    */
   federated(card, returning) {
-    card.append(this.button(`Continue with Google`, 'outline', async () => {
-      try {
-        this.afterIdentity(await this.auth.googleSignIn());
-      } catch (err) {
-        console.error('[auth] google', err);
-        this.error(card, 'We couldn\u2019t finish signing you in with Google. Try again, or use a code instead.');
-      }
-    }));
-
-    // Only offered where the server half exists — an Apple button that goes
-    // nowhere is worse than no Apple button.
-    if (this.auth.appleSignIn) {
-      card.append(this.button('Continue with Apple', 'outline', async () => {
-        try {
-          this.afterIdentity(await this.auth.appleSignIn());
-        } catch (err) {
-          console.error('[auth] apple', err);
-          this.error(card, 'We couldn\u2019t finish signing you in with Apple. Try again, or use a code instead.');
-        }
-      }));
-    }
-
+    this.oauthRow(card);
     card.append(this.button('Email or text me a code', 'ghost', () => this.screen('code')));
 
     if (returning && this.canPasskey) {
@@ -360,6 +374,77 @@ class AuthGate {
       }, 'fingerprint'));
     }
     return card;
+  }
+
+  /**
+   * Google and Apple, side by side. Two short labels read faster than two
+   * full-width "Continue with ..." bars, and the marks do most of the work.
+   * Falls back to one full-width button when Apple isn't wired up.
+   */
+  oauthRow(card) {
+    const row = document.createElement('div');
+    row.className = 'mx-gate__social';
+
+    row.append(this.button('Google', 'outline', async () => {
+      try {
+        this.afterIdentity(await this.auth.googleSignIn());
+      } catch (err) {
+        console.error('[auth] google', err);
+        this.error(card, 'We couldn\u2019t finish signing you in with Google. Try again, or use a code instead.');
+      }
+    }, 'google'));
+
+    // Only offered where the server half exists \u2014 an Apple button that goes
+    // nowhere is worse than no Apple button.
+    if (this.auth.appleSignIn) {
+      row.append(this.button('Apple', 'outline', async () => {
+        try {
+          this.afterIdentity(await this.auth.appleSignIn());
+        } catch (err) {
+          console.error('[auth] apple', err);
+          this.error(card, 'We couldn\u2019t finish signing you in with Apple. Try again, or use a code instead.');
+        }
+      }, 'apple'));
+    }
+
+    card.append(row);
+    return row;
+  }
+
+  /**
+   * The agreement line under the front doors. Rendered as links only when
+   * `opts.legal` carries real URLs: a sentence claiming someone agreed to
+   * documents they cannot open is worse than no sentence, and these are the
+   * documents PHIPA requires a custodian to publish.
+   */
+  legal(card) {
+    const { terms, privacy } = this.opts.legal || {};
+    const p = document.createElement('p');
+    p.className = 'mx-gate__legal';
+
+    const doc = (label, href) => {
+      if (!href) return document.createTextNode(label);
+      const a = document.createElement('a');
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = label;
+      return a;
+    };
+
+    if (!terms || !privacy) {
+      console.warn('[SecureChat] no opts.legal.terms / opts.legal.privacy \u2014 ' +
+        'the agreement line is showing without links to the documents it names.');
+    }
+
+    p.append(
+      document.createTextNode('By continuing you agree to our '),
+      doc('Terms of Use', terms),
+      document.createTextNode(' and '),
+      doc('Privacy Notice', privacy),
+      document.createTextNode('. Message and data rates apply.'));
+    card.append(p);
+    return p;
   }
 
   loadingScreen() {
@@ -376,16 +461,32 @@ class AuthGate {
   welcomeScreen() {
     const card = this.card(
       `Welcome to ${this.opts.pharmacyName}`,
-      'Refills, transfers and a pharmacist you can message. Your conversation contains health information, so we need to know it\u2019s you.',
+      'Refills, transfers and a pharmacist you can message, right in your pocket.',
       'hero');
 
-    card.append(this.button('Sign up with email', 'primary', () => this.screen('signup')));
-    // No passkey here: nobody arriving at a sign-up screen has one to use.
-    this.federated(card, false);
+    // One field, either kind. People know their own number or their own
+    // address; making them pick which one they are about to type is a
+    // decision the screen can make for them.
+    const to = this.field(card, 'Phone or email',
+      { type: 'text', autocomplete: 'username',
+        placeholder: 'Enter phone number or email' });
+
+    const submit = this.button('Create my account', 'primary', () => {
+      const value = to.value.trim();
+      const phone = tenDigits(value);
+      if (!phone && !EMAIL_RE.test(value)) {
+        return this.error(card, 'Please enter a mobile number or an email address.');
+      }
+      this.screen('signup', { to: value });
+    });
+    card.append(submit);
+    to.addEventListener('keydown', e => { if (e.key === 'Enter') submit.click(); });
 
     this.rule(card, 'or');
+    // No passkey here: nobody arriving at a sign-up screen has one to use.
+    this.oauthRow(card);
 
-    // Guest is intake only — no transcript, since that would expose health history.
+    // Guest is intake only \u2014 no transcript, since that would expose health history.
     card.append(this.button('Continue as guest', 'ghost', () =>
       this.ready({ guest: true, name: '', email: '', phone: '' })));
     const note = document.createElement('p');
@@ -394,16 +495,36 @@ class AuthGate {
     card.append(note);
 
     this.trust(card);
-    this.foot(card, 'Already have an account?', 'Log in', () => this.screen('login'));
+    this.foot(card, 'Already have an account?', 'Log in', () => this.screen('login'), true);
+    this.legal(card);
     return card;
   }
 
-  signupScreen() {
+  /**
+   * Second half of signing up. The identifier is already in hand from the
+   * welcome screen, so this asks only for what is still missing.
+   *
+   * @param {{to?: string}} [data]  whatever was typed on the welcome screen
+   */
+  signupScreen(data) {
+    const typed = String(data?.to || '').trim();
+    const asPhone = tenDigits(typed);
+
     const card = this.card('Create your account',
-      `We\u2019ll use this to reach you about your requests — nothing else.`, 'small');
+      `We\u2019ll use this to reach you about your requests \u2014 nothing else.`, 'small');
 
     const name = this.field(card, 'Full name', { type: 'text', autocomplete: 'name' });
-    const email = this.field(card, 'Email address', { type: 'email', autocomplete: 'email', inputMode: 'email' });
+    const email = this.field(card, 'Email address',
+      { type: 'email', autocomplete: 'email', inputMode: 'email',
+        value: asPhone ? '' : typed });
+
+    // Only asked for when they gave us one. The forms collect a number per
+    // request anyway, so a second empty field here would be asking twice.
+    const mobile = asPhone
+      ? this.field(card, 'Mobile number',
+          { type: 'tel', autocomplete: 'tel', inputMode: 'tel', value: typed })
+      : null;
+
     const pw = this.passwordField(card, 'Password', 'new-password');
 
     const hint = document.createElement('p');
@@ -414,17 +535,23 @@ class AuthGate {
     const submit = this.button('Create account', 'primary', async () => {
       if (!name.value.trim()) return this.error(card, 'Please enter your name.');
       if (!EMAIL_RE.test(email.value.trim())) return this.error(card, 'Please check your email address.');
+      if (mobile && !tenDigits(mobile.value)) {
+        return this.error(card, 'Please check your mobile number.');
+      }
       if (pw.value.length < MIN_PASSWORD) {
         return this.error(card, `Please use at least ${MIN_PASSWORD} characters.`);
       }
       submit.disabled = true;
       try {
         this.afterIdentity(await this.auth.signUp({
-          name: name.value.trim(), email: email.value.trim(), password: pw.value
+          name: name.value.trim(),
+          email: email.value.trim(),
+          phone: mobile ? tenDigits(mobile.value) : null,
+          password: pw.value
         }));
       } catch (err) {
         console.error('[auth] signup', err);
-        // Deliberately not "that email is taken" — that confirms who is a
+        // Deliberately not "that email is taken" \u2014 that confirms who is a
         // patient here to anyone who can type an address.
         this.error(card, 'We couldn\u2019t create that account. Try logging in, or call us at [Phone Number].');
       } finally {
@@ -433,8 +560,11 @@ class AuthGate {
     });
     card.append(submit);
 
+    card.append(this.button('Back', 'ghost', () => this.screen('welcome')));
+
     this.trust(card);
-    this.foot(card, 'Already have an account?', 'Log in', () => this.screen('login'));
+    this.foot(card, 'Already have an account?', 'Log in', () => this.screen('login'), true);
+    this.legal(card);
     return card;
   }
 
@@ -477,7 +607,8 @@ class AuthGate {
     this.federated(card, true);
 
     this.trust(card);
-    this.foot(card, 'New to Medixly?', 'Create an account', () => this.screen('welcome'));
+    this.foot(card, 'New to Medixly?', 'Create an account', () => this.screen('welcome'), true);
+    this.legal(card);
     return card;
   }
 

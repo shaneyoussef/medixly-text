@@ -249,6 +249,20 @@ system answers the substantive part of any patient request.
    twelve rules in the `secure-chat.auth.js` footer are all outstanding server
    work; 7 to 12 exist only because there are now passwords.
 
+   **The identifier is collected on the first screen**, phone or email in one
+   field, and carried into the create-account form — so the welcome screen is
+   one field and one button rather than a menu of ways in. A number lands in a
+   prefilled Mobile field; an address lands in Email. The mobile field is only
+   rendered when they actually gave us a number, since every form already
+   collects one per request.
+
+   `opts.legal` needs `{ terms, privacy }` URLs. Without them the agreement
+   line still renders but its two document names are plain text and a console
+   warning fires — a sentence saying someone agreed to documents they cannot
+   open is worse than no sentence, and these are two of the four documents
+   PHIPA requires (see `../docs/privacy-documents.md`). **Neither page exists
+   yet.**
+
    Face ID appears on **log in and never on sign up**. `passkeyAuth()` asks the
    device for a credential enrolled here earlier, so on a sign-up screen it can
    only fail — it is a sign-in method, not a way to create an account.
