@@ -81,10 +81,43 @@ function tenDigits(value) {
  *
  * Both custom properties fall back to a visible layout if this never runs.
  *
+ * `is-keyboard` comes off the shell whenever a keyboard is up, and the
+ * composer's resting bottom padding goes with it. That padding exists to clear
+ * the home indicator, and the home indicator is not on screen while the
+ * keyboard is — leaving it there is a band of dead space sitting between the
+ * message bar and the keys.
+ *
+ * Two signals decide it, because the obvious one is not reliable enough. The
+ * viewport arithmetic (`innerHeight - vv.height`) is the *second* signal here,
+ * not the first: it depends on iOS reporting heights the way you'd expect, and
+ * on a real phone it did not fire. Focus is the first signal, and it cannot
+ * miss — iOS raises the keyboard because a text field took focus, so the field
+ * taking focus *is* the event. Either one turns it on; both have to be off to
+ * turn it off.
+ *
  * @param {HTMLElement} root
  * @param {() => void} [onResize]  called after each change, to re-pin the log
  */
 function trackViewport(root, onResize) {
+  let byViewport = false, byFocus = false;
+  const sync = () => root.classList.toggle('is-keyboard', byViewport || byFocus);
+
+  /* Fields that raise a keyboard. Buttons, checkboxes and file pickers don't,
+     and neither does a date input — that one opens a wheel, but the 18px this
+     costs it is not worth a special case. */
+  const raisesKeyboard = el => !!el && el.matches?.(
+    'textarea, [contenteditable="true"], ' +
+    'input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]):not([type=file])');
+
+  root.addEventListener('focusin', e => {
+    byFocus = raisesKeyboard(e.target);
+    sync();
+  });
+  root.addEventListener('focusout', () => {
+    // Runs before focus lands on whatever is next, so ask on the next tick.
+    setTimeout(() => { byFocus = raisesKeyboard(document.activeElement); sync(); }, 0);
+  });
+
   const vv = window.visualViewport;
   if (!vv) return;                       // older browsers keep the dvh fallback
 
@@ -95,10 +128,8 @@ function trackViewport(root, onResize) {
       const style = document.documentElement.style;
       style.setProperty('--vvh', `${Math.round(vv.height)}px`);
       style.setProperty('--vvtop', `${Math.round(vv.offsetTop)}px`);
-      // A keyboard is the only thing that takes this much of the screen. The
-      // composer's resting padding exists to clear the home indicator, which
-      // is not on screen while the keyboard is, so it gives that space back.
-      root.classList.toggle('is-keyboard', window.innerHeight - vv.height > 120);
+      byViewport = window.innerHeight - vv.height > 120;
+      sync();
       onResize?.();
     });
   };

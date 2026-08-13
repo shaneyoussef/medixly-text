@@ -360,9 +360,20 @@ system answers the substantive part of any patient request.
    first version of that test only modelled the shrink, which is precisely why
    the bug shipped.
 
-   It also sets `is-keyboard` on the shell, which drops the composer's 30px
-   bottom padding. That padding is there to clear the home indicator, and the
-   home indicator is not on screen while the keyboard is.
+   It also sets `is-keyboard` on the shell, which replaces the composer's 30px
+   bottom padding *and* the safe-area inset stacked on it with 8px. Both exist
+   to clear the home indicator, and the home indicator is not on screen while
+   the keyboard is — together they were a visible band of nothing between the
+   message bar and the keys.
+
+   **Two signals decide `is-keyboard`, and focus is the primary one.** The
+   viewport arithmetic (`innerHeight - vv.height > 120`) reads like the
+   obvious test and did not fire on a real iPhone; it is kept as a second
+   opinion. Focus cannot miss, because iOS raises the keyboard *because* a
+   text field took focus — so the field taking focus is the event. Either
+   turns it on, both must be off to turn it off. If this ever regresses, test
+   the focus path first: it is the one that works with no viewport change at
+   all, which is exactly what `focus.mjs` checks.
 
    Never put the card back inside `[data-stream]`. `render()` calls
    `replaceChildren()` on that node and would delete it.

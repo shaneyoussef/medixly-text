@@ -141,10 +141,12 @@ button,textarea{font-family:inherit}
   padding:var(--space-3) var(--space-6) 30px;
   padding-bottom:calc(30px + env(safe-area-inset-bottom, 0px));
   background:linear-gradient(180deg, rgba(247,243,236,0), rgba(247,243,236,.92) 40%)}
-/* Typing: the 30px under the composer is there to clear the home indicator,
-   and the home indicator is not on screen while the keyboard is. Give it back
-   so the message bar sits on the keyboard rather than above a dead band. */
-.is-keyboard .mx-composer{padding-bottom:var(--space-3)}
+/* Typing: the 30px under the composer, and the safe-area inset stacked on top
+   of it, are both there to clear the home indicator — which is not on screen
+   while the keyboard is. Together they were a visible band of nothing between
+   the message bar and the keys. The declaration below overrides both, since
+   it replaces the padding rather than adding to it. */
+.is-keyboard .mx-composer{padding-bottom:var(--space-2)}
 .mx-chips{display:flex;align-items:center;gap:var(--space-2);overflow-x:auto}
 .mx-chips:empty{display:none}
 
