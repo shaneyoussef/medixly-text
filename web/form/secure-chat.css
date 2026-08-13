@@ -1,7 +1,12 @@
 *,*::before,*::after{box-sizing:border-box}
 /* Full bleed. This is a messaging app, not a device mockup — it fills the
    window on a phone and on a desktop alike, the way a messenger does. */
-body{margin:0;background:var(--surface-page);min-height:100dvh}
+/* --vvh is the visual viewport height, set by trackViewport() in
+   secure-chat.core.js — the screen minus the keyboard, which 100dvh does not
+   account for on iOS. The dvh is the fallback for browsers without
+   visualViewport. Fixed height plus overflow:hidden means the document itself
+   never scrolls: only the thread does. */
+body{margin:0;background:var(--surface-page);height:var(--vvh,100dvh);overflow:hidden}
 button,textarea{font-family:inherit}
 
 /* ── Icons: Lucide, masked so they inherit currentColor (Icon.jsx) ─── */
@@ -13,7 +18,7 @@ button,textarea{font-family:inherit}
 .mx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* ── Shell ─────────────────────────────────────────────────────────── */
-.mx-chat{position:relative;display:flex;flex-direction:column;width:100%;height:100dvh;
+.mx-chat{position:relative;display:flex;flex-direction:column;width:100%;height:var(--vvh,100dvh);
   background:var(--surface-glow);color:var(--ink-900);overflow:hidden}
 
 /* Wide windows get a reading measure so lines don't run the full desktop, but
@@ -126,6 +131,10 @@ button,textarea{font-family:inherit}
   padding:var(--space-3) var(--space-6) 30px;
   padding-bottom:calc(30px + env(safe-area-inset-bottom, 0px));
   background:linear-gradient(180deg, rgba(247,243,236,0), rgba(247,243,236,.92) 40%)}
+/* Typing: the 30px under the composer is there to clear the home indicator,
+   and the home indicator is not on screen while the keyboard is. Give it back
+   so the message bar sits on the keyboard rather than above a dead band. */
+.is-keyboard .mx-composer{padding-bottom:var(--space-3)}
 .mx-chips{display:flex;align-items:center;gap:var(--space-2);overflow-x:auto}
 .mx-chips:empty{display:none}
 

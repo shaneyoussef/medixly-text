@@ -56,6 +56,48 @@ function tenDigits(value) {
   return null;
 }
 
+/**
+ * Keeps the shell the size of what the patient can actually see.
+ *
+ * `100dvh` is the viewport with the browser chrome accounted for — but not the
+ * keyboard. On iOS Safari the layout viewport does not shrink when the
+ * keyboard opens, so the shell stays full height, the bottom of it slides
+ * under the keyboard, and Safari scrolls the page to rescue the focused
+ * field. That is where the dead band between the message bar and the keyboard
+ * came from, and it is also what used to push the pharmacy's name off the top.
+ *
+ * `visualViewport` is the part actually on screen, keyboard subtracted. Track
+ * it and the composer sits on the keyboard, the header stays put, and the
+ * document has nothing left to scroll.
+ *
+ * @param {HTMLElement} root
+ * @param {() => void} [onResize]  called after each change, to re-pin the log
+ */
+function trackViewport(root, onResize) {
+  const vv = window.visualViewport;
+  if (!vv) return;                       // older browsers keep the dvh fallback
+
+  let frame = 0;
+  const apply = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      document.documentElement.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+      // A keyboard is the only thing that takes this much of the screen. The
+      // composer's resting padding exists to clear the home indicator, which
+      // is not on screen while the keyboard is, so it gives that space back.
+      root.classList.toggle('is-keyboard', window.innerHeight - vv.height > 120);
+      // Safari may already have scrolled the document to reveal the focused
+      // field. Once the shell is exactly the visible height there is nothing
+      // to reveal, so undo it.
+      if (vv.offsetTop || window.scrollY) window.scrollTo(0, 0);
+      onResize?.();
+    });
+  };
+  vv.addEventListener('resize', apply);
+  vv.addEventListener('scroll', apply);
+  apply();
+}
+
 /* ── Attachments ───────────────────────────────────────────────────── */
 const MAX_FILES = 5;
 const MAX_BYTES = 10 * 1024 * 1024;                       // 10 MB per file
@@ -225,6 +267,9 @@ class SecureChat {
 
     this.$('back').addEventListener('click', () => this.opts.onBack?.());
     this.$('call').addEventListener('click', () => this.opts.onCall?.());
+
+    // Keep the newest message against the keyboard as it opens and closes.
+    trackViewport(this.root, () => { if (this.stick) this.scrollDown('auto'); });
 
     if (o.history) this.load(o.history);
     this.renderServices();

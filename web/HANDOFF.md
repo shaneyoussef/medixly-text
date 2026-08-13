@@ -23,7 +23,7 @@ don't merge into it.
 | `ds-tokens.css` | Copy of the Medixly design tokens so the page opens standalone. In the app, drop it and link the real design system. | yes |
 | `secure-chat.css` | All chat styling. | yes |
 | `secure-chat.auth.css` | Sign-in card styling, plus the rules that hide the transcript for a guest, an unlinked account and the idle lock. | yes |
-| `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
+| `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour, including `trackViewport()` for the on-screen keyboard. Read this first. | yes |
 | `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | yes |
 | `secure-chat.auth.js` | `AuthGate`: the identifier-first sign-in flow, password reset, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
 | `secure-chat.shop.js` | `MedixlyShop`: product search, basket, Shopify checkout. | yes |
@@ -334,6 +334,21 @@ system answers the substantive part of any patient request.
    via `row()` rather than stacking, which is 50px that decides whether the
    password card fits once Face ID is offered. Both are load-bearing, not
    tidying.
+
+   **The shell is sized from `visualViewport`, not `100dvh`.** `100dvh` counts
+   the browser chrome but not the keyboard: on iOS the layout viewport does
+   not shrink when the keyboard opens, so the bottom of the shell slides under
+   it and Safari scrolls the page to rescue the focused field. That is where
+   the dead band between the message bar and the keyboard came from, and it is
+   the same mechanism that used to push the pharmacy's name off the top.
+   `trackViewport()` writes `--vvh`, `body` and `.mx-chat` read it, `body` is
+   `overflow:hidden`, and the document has nothing left to scroll — only the
+   thread does. `100dvh` stays as the fallback for browsers without
+   `visualViewport`.
+
+   It also sets `is-keyboard` on the shell, which drops the composer's 30px
+   bottom padding. That padding is there to clear the home indicator, and the
+   home indicator is not on screen while the keyboard is.
 
    Never put the card back inside `[data-stream]`. `render()` calls
    `replaceChildren()` on that node and would delete it.
