@@ -1,4 +1,4 @@
-160519f  2026-08-13 20:29  Lock the chat until they choose how to come in
+581436a  2026-08-13 20:39  Say we start now, and say it once
 
 What this file is for
 ---------------------
