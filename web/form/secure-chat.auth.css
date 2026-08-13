@@ -230,3 +230,18 @@
 .is-locked .mx-jump,
 .is-checkout .mx-log .mx-msg:not(.mx-msg--form),
 .is-checkout .mx-jump{display:none}
+
+/* Locked until they choose how to come in.
+
+   `inert` on the rail and the composer is what actually stops them — set in
+   AuthGate.gate(), so the buttons are unclickable and unfocusable rather than
+   merely faint. This rule is the half the patient can see, plus a
+   pointer-events belt for anything that predates inert.
+
+   The header is not in this list on purpose. Its call button reaches the
+   pharmacy, and the notice above the thread tells people to call rather than
+   message in an emergency. Signing in never stands between someone and a
+   phone call. */
+.is-gated .mx-quick,
+.is-gated .mx-composer{opacity:.45;pointer-events:none;
+  transition:opacity var(--duration-base) var(--ease-standard)}

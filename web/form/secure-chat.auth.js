@@ -9,11 +9,16 @@
    Plus the screens that hang off them — email/SMS code, password reset,
    passkey enrollment and the idle lock.
 
-   The card renders *inside* the thread, as its opening message. The chat is
-   whole the whole time: the header, the service rail and the composer stay
-   live, and a patient can open a form and send a request without ever
-   touching the card. What signing in adds is message history and not having
-   to retype themselves.
+   The card renders *inside* the thread, as its opening message, so the chat
+   is visible the whole time — the pharmacy's name in the header, the service
+   rail and the composer where they will be. But visible is not usable: while
+   the card is up the rail and the composer are `inert`, and nothing behind it
+   can be tapped or tabbed to. One question gets answered first, and guest is
+   one tap, so nobody is kept out.
+
+   The header is the exception, on purpose. Its call button reaches the
+   pharmacy and nothing about signing in may stand between someone and a
+   phone call.
 
    Nothing here asks for a health card number or a date of birth. See the
    note on afterIdentity() for what replaced that, and why.
@@ -138,12 +143,30 @@ class AuthGate {
     log.scrollTop += this.layer.getBoundingClientRect().top - log.getBoundingClientRect().top;
   }
 
-  /** Shows or hides the card, and tells the shell which state it is in. */
+  /**
+   * Shows or hides the card, and locks the chat behind it.
+   *
+   * While the card is up the service rail and the composer are `inert`: not
+   * clickable, not focusable, not reachable by keyboard or screen reader. The
+   * patient has to answer one question first — an account, Google, or guest —
+   * and guest is one tap, so nobody is kept out. Dimming alone would not do;
+   * a disabled-looking button that still submits a transfer request is worse
+   * than no lock at all.
+   *
+   * The header is deliberately *not* locked. Its call button reaches the
+   * pharmacy, and the notice at the top of the thread tells people to call
+   * rather than message in an emergency. Nothing about signing in may stand
+   * between someone and a phone call.
+   */
   gate(open) {
     this.layer.hidden = !open;
-    // The jump-to-latest pill would otherwise float over the card, offering to
-    // scroll past the one thing on screen.
+    // Also drops the jump-to-latest pill, which would otherwise float over the
+    // card offering to scroll past the one thing on screen.
     this.host.classList.toggle('is-gated', open);
+    for (const sel of ['[data-quick]', '.mx-composer']) {
+      const el = this.host.querySelector(sel);
+      if (el) el.inert = open;
+    }
   }
 
   ready(profile) {

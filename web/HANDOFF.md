@@ -267,11 +267,19 @@ system answers the substantive part of any patient request.
    **The card lives in the thread, not over it.** `AuthGate` inserts itself
    into `[data-log]` ahead of `[data-stream]`, so it reads as the opening
    message and anything the patient opens afterwards lands underneath it. The
-   chat is whole the entire time — header, service rail and composer all live
-   — and tapping a service before signing in opens that form and submits it,
-   because every form carries its own identity fields and its own consent.
-   Signing in buys message history and not retyping yourself; it is not a toll
-   gate on the service.
+   chat is visible the entire time — header, rail and composer all where they
+   will be.
+
+   **Visible is not usable.** While the card is up, `gate()` sets `inert` on
+   `[data-quick]` and `.mx-composer`: nothing behind the card can be tapped,
+   focused or tabbed to, and the `.is-gated` CSS dims them so it looks like
+   what it is. Dimming alone was not enough — a faded shortcut that still
+   opens a transfer form is worse than no lock. One question gets answered
+   first, and guest is one tap, so nobody is kept out.
+
+   The header is deliberately excluded. Its call button reaches the pharmacy,
+   and the notice above the thread tells people to call rather than message in
+   an emergency. Signing in never stands between someone and a phone call.
 
    Two consequences for whoever wires the server. **History is the server's
    job, not the CSS's**: an unauthenticated client must be sent no transcript
