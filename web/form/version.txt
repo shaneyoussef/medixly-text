@@ -1,4 +1,4 @@
-8b42c41  2026-08-13 20:58  Pin the shell to the visible region, not just its height
+cbc15ce  2026-08-13 21:17  Detect the keyboard by focus, not by arithmetic
 
 What this file is for
 ---------------------
