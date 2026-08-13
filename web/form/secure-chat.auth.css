@@ -107,6 +107,22 @@
 .mx-gate__reveal .mx-icon{background-color:var(--ink-400)}
 .mx-gate__reveal:hover .mx-icon{background-color:var(--clay-700)}
 
+/* The front door's one field, with its submit on the end of it rather than
+   on a row of its own — the same shape as the message composer at the foot of
+   this screen, so it reads as something to fill in and send. Two rows fused
+   into one is what lets the welcome card fit a phone. */
+.mx-gate__bar{position:relative;margin-bottom:var(--space-2)}
+.mx-gate__entry{padding-right:calc(var(--field-height) + var(--space-2))}
+.mx-gate__go{position:absolute;top:4px;right:4px;display:flex;align-items:center;
+  justify-content:center;width:36px;height:36px;border:none;cursor:pointer;
+  border-radius:var(--radius-circle);background:var(--action-primary);
+  box-shadow:var(--shadow-cut);transition:var(--transition-control)}
+.mx-gate__go .mx-icon{background-color:var(--text-on-accent)}
+.mx-gate__go:hover{background:var(--action-primary-hover)}
+.mx-gate__go:active{background:var(--action-primary-active);
+  box-shadow:var(--shadow-press);transform:translateY(1px)}
+.mx-gate__go:disabled{opacity:.55;cursor:default}
+
 /* Right-aligned, on its own line, directly under the password — where the
    person who just failed to remember it is already looking. */
 .mx-gate__aux{display:flex;justify-content:flex-end;

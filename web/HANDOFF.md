@@ -279,12 +279,21 @@ system answers the substantive part of any patient request.
    record attached. And `is-locked` is the strict one — it hides forms and the
    notice too, because a half-filled assessment is what a locked screen is for.
 
-   **One door, not two.** The welcome card is three buttons — phone or email,
-   Google, guest — and nothing else. There is no "log in" beside a "sign up",
-   because the patient does not know which one they are; people forget whether
-   they ever made an account. They give an identifier, `auth.lookup()` decides,
-   and the next card either asks for a password (returning) or finishes a
-   profile (new). Screens: `welcome → identify → password | signup → setpw`.
+   **One door, not two.** The welcome card is a bar to fill in — phone or
+   email — and two buttons under it, Google and guest. Nothing else. There is
+   no "log in" beside a "sign up", because the patient does not know which one
+   they are; people forget whether they ever made an account. They type an
+   identifier, `auth.lookup()` decides, and the next card either asks for a
+   password (returning) or finishes a profile (new). Screens:
+   `welcome → password | signup → setpw`.
+
+   The bar carries its own submit — a round arrow on the end of the field,
+   the same shape as the message composer at the foot of the same screen — so
+   the field and its button share one row. That fusion is worth 50px, and 50px
+   is the difference between this card fitting a phone and not. It is also the
+   one field in the gate with no visible label: `aria-label` plus a
+   descriptive placeholder carry it, because the label's row is a row the card
+   does not have.
 
    `lookup()` is the one piece of this that is a real trade. It answers "is
    this person a patient at this pharmacy", and `docs/PIA.md` §3 treats the

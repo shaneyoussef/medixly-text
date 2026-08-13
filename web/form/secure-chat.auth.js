@@ -206,8 +206,7 @@ class AuthGate {
   screen(name, data) {
     const build = {
       loading:  () => this.loadingScreen(),
-      welcome:  () => this.welcomeScreen(),
-      identify: () => this.identifyScreen(data),
+      welcome:  () => this.welcomeScreen(data),
       password: () => this.passwordScreen(data),
       signup:   () => this.signupScreen(data),
       setpw:    () => this.setPasswordScreen(data),
@@ -375,6 +374,9 @@ class AuthGate {
    */
   anchor(card, box) {
     const before = card.querySelector('.mx-gate__btn--primary') ||
+                   // The welcome card's action lives inside the bar, so anchor
+                   // to the bar itself rather than to a button that isn't there.
+                   card.querySelector('.mx-gate__bar')?.nextSibling ||
                    card.querySelector('.mx-gate__fine');
     if (before) card.insertBefore(box, before);
   }
@@ -445,18 +447,75 @@ class AuthGate {
 
   /* ── Front door: new here ────────────────────────────────────── */
 
-  welcomeScreen() {
+  /**
+   * The whole front door: a bar to fill in, and two buttons.
+   *
+   * The bar carries its own submit rather than sitting above a Continue
+   * button, which is the same shape as the message composer at the foot of
+   * this screen — a field with a round arrow on the end of it. That is one
+   * row instead of two, and on a 424px thread window two rows is the
+   * difference between a card that fits and a card that scrolls.
+   *
+   * There is deliberately no "log in" door beside a "sign up" door: the
+   * patient does not know which one they are, because people forget whether
+   * they ever made an account here. The address decides, and `lookup()` sends
+   * them to a password or to a profile.
+   *
+   * `lookup()` is also, unavoidably, an endpoint that answers "is this person
+   * a patient here" — and PIA §3 treats the fact of care as health
+   * information. The design is the pharmacy's call; the mitigations are not
+   * optional. See rules 13 and 14 in the contract at the bottom of this file,
+   * and note the fallback below: if lookup fails for any reason, including
+   * being rate-limited, nobody is stuck — they get a code instead.
+   */
+  welcomeScreen(data) {
     const card = this.card(
       `Welcome to ${this.opts.pharmacyName}`,
       'Refills, transfers and a pharmacist you can message.',
       'hero');
 
-    // Three ways in and nothing else. There is deliberately no "log in" door
-    // beside a "sign up" door: the patient does not know which one they are —
-    // people forget whether they ever made an account here — so the address
-    // decides, one screen later, and they only ever answer one question.
-    card.append(this.button('Continue with phone or email', 'primary',
-      () => this.screen('identify')));
+    const bar = document.createElement('div');
+    bar.className = 'mx-gate__bar';
+
+    const to = document.createElement('input');
+    to.className = 'mx-control mx-gate__entry';
+    to.type = 'text';
+    to.autocomplete = 'username';
+    to.placeholder = 'Enter phone number or email';
+    // No visible label on this one field: the placeholder says the same thing,
+    // and the row it would cost is a row the card does not have.
+    to.setAttribute('aria-label', 'Phone number or email');
+
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'mx-gate__go';
+    go.setAttribute('aria-label', 'Continue');
+    go.append(icon('arrow-right', true));
+
+    bar.append(to, go);
+    card.append(bar);
+
+    const submit = async () => {
+      const value = to.value.trim();
+      if (!tenDigits(value) && !EMAIL_RE.test(value)) {
+        return this.error(card, 'Please enter a mobile number or an email address.');
+      }
+      go.disabled = true;
+      try {
+        const res = await this.auth.lookup({ to: value });
+        this.screen(res?.known ? 'password' : 'signup', { to: value });
+      } catch (err) {
+        console.error('[auth] lookup', err);
+        // Never a dead end. A code proves the same thing a password does and
+        // needs no answer about whether the account exists.
+        this.screen('code', { to: value });
+      } finally {
+        go.disabled = false;
+      }
+    };
+    go.addEventListener('click', submit);
+    to.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    if (data?.to) to.value = data.to;
 
     card.append(this.button('Continue with Google', 'outline', async () => {
       try {
@@ -474,51 +533,6 @@ class AuthGate {
     card.append(this.button('Continue as guest', 'ghost', () =>
       this.ready({ guest: true, name: '', email: '', phone: '' })));
 
-    return this.fineprint(card);
-  }
-
-  /**
-   * One field, then the flow forks by itself.
-   *
-   * `lookup()` is what decides whether the next card asks for a password or
-   * asks them to finish a profile. It is also, unavoidably, an endpoint that
-   * answers "is this person a patient here" — and PIA \u00a73 treats that as health
-   * information. The design is the patient's call; the mitigations are not
-   * optional. See rules 13 and 14 in the contract at the bottom of this file,
-   * and note the fallback below: if lookup fails for any reason, including
-   * being rate-limited, nobody is stuck — they get a code instead.
-   */
-  identifyScreen(data) {
-    const card = this.card('What\u2019s your phone or email?',
-      'We\u2019ll take it from there \u2014 you don\u2019t need to remember whether you have an account.');
-
-    const to = this.field(card, 'Phone or email',
-      { type: 'text', autocomplete: 'username',
-        placeholder: 'Enter phone number or email',
-        value: String(data?.to || '') });
-
-    const submit = this.button('Continue', 'primary', async () => {
-      const value = to.value.trim();
-      if (!tenDigits(value) && !EMAIL_RE.test(value)) {
-        return this.error(card, 'Please enter a mobile number or an email address.');
-      }
-      submit.disabled = true;
-      try {
-        const res = await this.auth.lookup({ to: value });
-        this.screen(res?.known ? 'password' : 'signup', { to: value });
-      } catch (err) {
-        console.error('[auth] lookup', err);
-        // Never a dead end. A code proves the same thing a password does and
-        // needs no answer about whether the account exists.
-        this.screen('code', { to: value });
-      } finally {
-        submit.disabled = false;
-      }
-    });
-    card.append(submit);
-    to.addEventListener('keydown', e => { if (e.key === 'Enter') submit.click(); });
-
-    card.append(this.button('Back', 'ghost', () => this.screen('welcome')));
     return this.fineprint(card);
   }
 
@@ -562,7 +576,7 @@ class AuthGate {
 
     this.row(card,
       this.button('Send a code', 'ghost', () => this.screen('code', { to })),
-      this.button('Back', 'ghost', () => this.screen('identify', { to })));
+      this.button('Back', 'ghost', () => this.screen('welcome', { to })));
     return this.fineprint(card);
   }
 
@@ -610,7 +624,7 @@ class AuthGate {
     card.append(submit);
     other.addEventListener('keydown', e => { if (e.key === 'Enter') submit.click(); });
 
-    card.append(this.button('Back', 'ghost', () => this.screen('identify', { to: typed })));
+    card.append(this.button('Back', 'ghost', () => this.screen('welcome', { to: typed })));
     return this.fineprint(card);
   }
 
@@ -673,7 +687,7 @@ class AuthGate {
       send.disabled = false;
     });
     card.append(send);
-    card.append(this.button('Back', 'ghost', () => this.screen('identify', { to })));
+    card.append(this.button('Back', 'ghost', () => this.screen('welcome', { to })));
     return this.fineprint(card);
   }
 
@@ -862,5 +876,5 @@ class AuthGate {
       and costs an attacker their whole method.
   14. Better, when you can: skip `lookup` and always send a code. The code
       proves the same thing and answers nothing. Keep the fallback in
-      identifyScreen() working, because that is what it is for.
+      welcomeScreen() working, because that is what it is for.
    ═══════════════════════════════════════════════════════════════════ */
