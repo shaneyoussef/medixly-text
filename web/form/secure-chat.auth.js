@@ -164,8 +164,7 @@ class AuthGate {
     this.profile = null;
     this.opts.onSession?.(null);
     this.gate(true);
-    // Someone signing out has an account, so send them to login, not welcome.
-    this.screen('login');
+    this.screen('welcome');
   }
 
   /**
@@ -206,11 +205,13 @@ class AuthGate {
 
   screen(name, data) {
     const build = {
-      loading: () => this.loadingScreen(),
-      welcome: () => this.welcomeScreen(),
-      signup:  () => this.signupScreen(data),
-      login:   () => this.loginScreen(),
-      reset:   () => this.resetScreen(),
+      loading:  () => this.loadingScreen(),
+      welcome:  () => this.welcomeScreen(),
+      identify: () => this.identifyScreen(data),
+      password: () => this.passwordScreen(data),
+      signup:   () => this.signupScreen(data),
+      setpw:    () => this.setPasswordScreen(data),
+      reset:    () => this.resetScreen(data),
       code:    () => this.codeScreen(data),
       passkey: () => this.passkeyScreen(data),
       locked:  () => this.lockedScreen()
@@ -279,6 +280,19 @@ class AuthGate {
     return a;
   }
 
+  /**
+   * Two buttons side by side, sharing one row's height. Used where a card has
+   * a pair of equal-weight secondary actions — on a phone, stacking those is
+   * 50px that pushes the whole card past the fold for no gain in clarity.
+   */
+  row(card, ...buttons) {
+    const row = document.createElement('div');
+    row.className = 'mx-gate__social';
+    row.append(...buttons);
+    card.append(row);
+    return row;
+  }
+
   /** A labelled field. Returns the input so the caller can read it. */
   field(card, label, attrs = {}) {
     const wrap = document.createElement('div');
@@ -342,25 +356,6 @@ class AuthGate {
     return input;
   }
 
-  rule(card, label) {
-    const rule = document.createElement('div');
-    rule.className = 'mx-gate__rule';
-    const span = document.createElement('span');
-    span.textContent = label;
-    rule.append(span);
-    card.append(rule);
-    return rule;
-  }
-
-  /** The switch at the foot of a card: "Already have an account? Log in". */
-  foot(card, sentence, label, onClick, arrow) {
-    const p = document.createElement('p');
-    p.className = 'mx-gate__foot';
-    p.append(document.createTextNode(sentence + ' '), this.link(label, onClick, arrow));
-    card.append(p);
-    return p;
-  }
-
   error(card, message) {
     let box = card.querySelector('.mx-gate__err');
     if (!box) {
@@ -380,7 +375,7 @@ class AuthGate {
    */
   anchor(card, box) {
     const before = card.querySelector('.mx-gate__btn--primary') ||
-                   card.querySelector('.mx-trust');
+                   card.querySelector('.mx-gate__fine');
     if (before) card.insertBefore(box, before);
   }
 
@@ -439,68 +434,6 @@ class AuthGate {
     return card;
   }
 
-  /**
-   * The methods that are the same on both front doors. A patient shouldn't
-   * have to remember which screen offered Google.
-   *
-   * @param {boolean} [returning]  true on the screens for someone who already
-   *   has an account. Gates the passkey offer, which is a *sign-in* method and
-   *   nothing else: `passkeyAuth()` asks the device for a credential that was
-   *   enrolled here earlier, so on a sign-up screen it can only ever fail.
-   *   Enrollment is offered once, after the record link, on passkeyScreen().
-   */
-  federated(card, returning) {
-    this.oauthRow(card);
-    card.append(this.button('Email or text me a code', 'ghost', () => this.screen('code')));
-
-    if (returning && this.canPasskey) {
-      card.append(this.button('Use Face ID or fingerprint', 'ghost', async () => {
-        try {
-          this.afterIdentity(await this.auth.passkeyAuth());
-        } catch (err) {
-          console.error('[auth] passkey', err);
-          this.error(card, 'That didn\u2019t work. Sign in with Google or a code, then try again.');
-        }
-      }, 'fingerprint'));
-    }
-    return card;
-  }
-
-  /**
-   * Google and Apple, side by side. Two short labels read faster than two
-   * full-width "Continue with ..." bars, and the marks do most of the work.
-   * Falls back to one full-width button when Apple isn't wired up.
-   */
-  oauthRow(card) {
-    const row = document.createElement('div');
-    row.className = 'mx-gate__social';
-
-    row.append(this.button('Google', 'outline', async () => {
-      try {
-        this.afterIdentity(await this.auth.googleSignIn());
-      } catch (err) {
-        console.error('[auth] google', err);
-        this.error(card, 'We couldn\u2019t finish signing you in with Google. Try again, or use a code instead.');
-      }
-    }, 'google'));
-
-    // Only offered where the server half exists \u2014 an Apple button that goes
-    // nowhere is worse than no Apple button.
-    if (this.auth.appleSignIn) {
-      row.append(this.button('Apple', 'outline', async () => {
-        try {
-          this.afterIdentity(await this.auth.appleSignIn());
-        } catch (err) {
-          console.error('[auth] apple', err);
-          this.error(card, 'We couldn\u2019t finish signing you in with Apple. Try again, or use a code instead.');
-        }
-      }, 'apple'));
-    }
-
-    card.append(row);
-    return row;
-  }
-
   loadingScreen() {
     const card = this.card('Just a moment');
     const dots = document.createElement('div');
@@ -518,65 +451,173 @@ class AuthGate {
       'Refills, transfers and a pharmacist you can message.',
       'hero');
 
-    // One field, either kind. People know their own number or their own
-    // address; making them pick which one they are about to type is a
-    // decision the screen can make for them.
+    // Three ways in and nothing else. There is deliberately no "log in" door
+    // beside a "sign up" door: the patient does not know which one they are —
+    // people forget whether they ever made an account here — so the address
+    // decides, one screen later, and they only ever answer one question.
+    card.append(this.button('Continue with phone or email', 'primary',
+      () => this.screen('identify')));
+
+    card.append(this.button('Continue with Google', 'outline', async () => {
+      try {
+        this.afterIdentity(await this.auth.googleSignIn());
+      } catch (err) {
+        console.error('[auth] google', err);
+        this.error(card, 'We couldn\u2019t finish signing you in with Google. Try again, or use your phone or email.');
+      }
+    }, 'google'));
+
+    // Guest is intake only \u2014 no transcript, since that would expose health
+    // history. It sits here rather than buried below the fold because it is a
+    // real answer to "I just want to send one thing", and the service rail
+    // behind this card already works that way.
+    card.append(this.button('Continue as guest', 'ghost', () =>
+      this.ready({ guest: true, name: '', email: '', phone: '' })));
+
+    return this.fineprint(card);
+  }
+
+  /**
+   * One field, then the flow forks by itself.
+   *
+   * `lookup()` is what decides whether the next card asks for a password or
+   * asks them to finish a profile. It is also, unavoidably, an endpoint that
+   * answers "is this person a patient here" — and PIA \u00a73 treats that as health
+   * information. The design is the patient's call; the mitigations are not
+   * optional. See rules 13 and 14 in the contract at the bottom of this file,
+   * and note the fallback below: if lookup fails for any reason, including
+   * being rate-limited, nobody is stuck — they get a code instead.
+   */
+  identifyScreen(data) {
+    const card = this.card('What\u2019s your phone or email?',
+      'We\u2019ll take it from there \u2014 you don\u2019t need to remember whether you have an account.');
+
     const to = this.field(card, 'Phone or email',
       { type: 'text', autocomplete: 'username',
-        placeholder: 'Enter phone number or email' });
+        placeholder: 'Enter phone number or email',
+        value: String(data?.to || '') });
 
-    const submit = this.button('Create my account', 'primary', () => {
+    const submit = this.button('Continue', 'primary', async () => {
       const value = to.value.trim();
-      const phone = tenDigits(value);
-      if (!phone && !EMAIL_RE.test(value)) {
+      if (!tenDigits(value) && !EMAIL_RE.test(value)) {
         return this.error(card, 'Please enter a mobile number or an email address.');
       }
-      this.screen('signup', { to: value });
+      submit.disabled = true;
+      try {
+        const res = await this.auth.lookup({ to: value });
+        this.screen(res?.known ? 'password' : 'signup', { to: value });
+      } catch (err) {
+        console.error('[auth] lookup', err);
+        // Never a dead end. A code proves the same thing a password does and
+        // needs no answer about whether the account exists.
+        this.screen('code', { to: value });
+      } finally {
+        submit.disabled = false;
+      }
     });
     card.append(submit);
     to.addEventListener('keydown', e => { if (e.key === 'Enter') submit.click(); });
 
-    this.rule(card, 'or');
-    // No passkey here: nobody arriving at a sign-up screen has one to use.
-    this.oauthRow(card);
+    card.append(this.button('Back', 'ghost', () => this.screen('welcome')));
+    return this.fineprint(card);
+  }
 
-    this.foot(card, 'Already have an account?', 'Log in', () => this.screen('login'), true);
+  /** Scenario one: they have been here before. */
+  passwordScreen(data) {
+    const to = String(data?.to || '');
+    const card = this.card('Welcome back', to);
 
-    // Guest is intake only \u2014 no transcript, since that would expose health
-    // history. It used to be a full-width button with a two-line explanation
-    // under it, which is a lot of card for the path fewest people want. The
-    // service rail already works without an account, so this is the reminder
-    // rather than the offer.
-    this.foot(card, 'Just sending one request?', 'Continue as guest', () =>
-      this.ready({ guest: true, name: '', email: '', phone: '' }));
-    this.fineprint(card);
-    return card;
+    const pw = this.passwordField(card, 'Password', 'current-password');
+
+    const aux = document.createElement('div');
+    aux.className = 'mx-gate__aux';
+    aux.append(this.link('Forgot password?', () => this.screen('reset', { to })));
+    card.append(aux);
+
+    const submit = this.button('Log in', 'primary', async () => {
+      if (!pw.value) return this.error(card, 'Please enter your password.');
+      submit.disabled = true;
+      try {
+        this.afterIdentity(await this.auth.passwordSignIn({ to, password: pw.value }));
+      } catch (err) {
+        console.error('[auth] login', err);
+        this.error(card, 'That password doesn\u2019t match. Try again, or reset it.');
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    card.append(submit);
+    pw.addEventListener('keydown', e => { if (e.key === 'Enter') submit.click(); });
+
+    if (this.canPasskey) {
+      card.append(this.button('Use Face ID or fingerprint', 'outline', async () => {
+        try {
+          this.afterIdentity(await this.auth.passkeyAuth());
+        } catch (err) {
+          console.error('[auth] passkey', err);
+          this.error(card, 'That didn\u2019t work. Use your password, or send yourself a code.');
+        }
+      }, 'fingerprint'));
+    }
+
+    this.row(card,
+      this.button('Send a code', 'ghost', () => this.screen('code', { to })),
+      this.button('Back', 'ghost', () => this.screen('identify', { to })));
+    return this.fineprint(card);
   }
 
   /**
-   * Second half of signing up. The identifier is already in hand from the
-   * welcome screen, so this asks only for what is still missing.
+   * Scenario two: they are new — and it is two cards, not one.
    *
-   * @param {{to?: string}} [data]  whatever was typed on the welcome screen
+   * Name, contact and password in one go came to 611px against a 424px thread
+   * window on an iPhone, which is the scrolling this whole layout exists to
+   * avoid. Split, each half fits with room over. The cost is one extra tap;
+   * the alternative was a form whose submit button nobody could see.
    */
   signupScreen(data) {
     const typed = String(data?.to || '').trim();
     const asPhone = tenDigits(typed);
 
-    const card = this.card('Create your account',
-      'Only what we need to reach you about a request.');
+    const card = this.card('Finish your profile',
+      'Two quick things, then you\u2019re in.');
 
-    const name = this.field(card, 'Full name', { type: 'text', autocomplete: 'name' });
-    const email = this.field(card, 'Email address',
-      { type: 'email', autocomplete: 'email', inputMode: 'email',
-        value: asPhone ? '' : typed });
+    const name = this.field(card, 'Full name',
+      { type: 'text', autocomplete: 'name', value: String(data?.name || '') });
 
-    // Only asked for when they gave us one. The forms collect a number per
-    // request anyway, so a second empty field here would be asking twice.
-    const mobile = asPhone
-      ? this.field(card, 'Mobile number',
-          { type: 'tel', autocomplete: 'tel', inputMode: 'tel', value: typed })
-      : null;
+    // Only the half they haven't already given us. Asking someone to retype
+    // the address they typed on the last card is how a form loses people.
+    const other = asPhone
+      ? this.field(card, 'Email address',
+          { type: 'email', autocomplete: 'email', inputMode: 'email',
+            value: String(data?.email || '') })
+      : this.field(card, 'Mobile number (optional)',
+          { type: 'tel', autocomplete: 'tel', inputMode: 'tel',
+            value: String(data?.phone || '') });
+
+    const submit = this.button('Continue', 'primary', () => {
+      if (!name.value.trim()) return this.error(card, 'Please enter your name.');
+      const value = other.value.trim();
+
+      if (asPhone) {
+        if (!EMAIL_RE.test(value)) return this.error(card, 'Please check your email address.');
+        return this.screen('setpw', { to: typed, name: name.value.trim(), email: value, phone: asPhone });
+      }
+      // The number is optional here, but a wrong one is worth catching now
+      // rather than after they have chosen a password.
+      if (value && !tenDigits(value)) return this.error(card, 'Please check your mobile number.');
+      this.screen('setpw', { to: typed, name: name.value.trim(), email: typed, phone: tenDigits(value) });
+    });
+    card.append(submit);
+    other.addEventListener('keydown', e => { if (e.key === 'Enter') submit.click(); });
+
+    card.append(this.button('Back', 'ghost', () => this.screen('identify', { to: typed })));
+    return this.fineprint(card);
+  }
+
+  /** Second half of the new-patient path: the one credential we store. */
+  setPasswordScreen(data) {
+    const card = this.card('Choose a password',
+      `So you can pick up where you left off next time.`);
 
     const pw = this.passwordField(card, 'Password', 'new-password');
 
@@ -586,88 +627,39 @@ class AuthGate {
     card.append(hint);
 
     const submit = this.button('Create account', 'primary', async () => {
-      if (!name.value.trim()) return this.error(card, 'Please enter your name.');
-      if (!EMAIL_RE.test(email.value.trim())) return this.error(card, 'Please check your email address.');
-      if (mobile && !tenDigits(mobile.value)) {
-        return this.error(card, 'Please check your mobile number.');
-      }
       if (pw.value.length < MIN_PASSWORD) {
         return this.error(card, `Please use at least ${MIN_PASSWORD} characters.`);
       }
       submit.disabled = true;
       try {
         this.afterIdentity(await this.auth.signUp({
-          name: name.value.trim(),
-          email: email.value.trim(),
-          phone: mobile ? tenDigits(mobile.value) : null,
-          password: pw.value
+          name: data.name, email: data.email, phone: data.phone || null, password: pw.value
         }));
       } catch (err) {
         console.error('[auth] signup', err);
         // Deliberately not "that email is taken" \u2014 that confirms who is a
         // patient here to anyone who can type an address.
-        this.error(card, 'We couldn\u2019t create that account. Try logging in, or call us at [Phone Number].');
+        this.error(card, 'We couldn\u2019t create that account. Call us at [Phone Number] and we\u2019ll sort it out.');
       } finally {
         submit.disabled = false;
       }
     });
     card.append(submit);
-
-    card.append(this.button('Back', 'ghost', () => this.screen('welcome')));
-
-    this.foot(card, 'Already have an account?', 'Log in', () => this.screen('login'), true);
-    this.fineprint(card);
-    return card;
-  }
-
-  /* ── Front door: been here before ────────────────────────────── */
-
-  loginScreen() {
-    const card = this.card('Log in', `Welcome back to ${this.opts.pharmacyName}.`);
-
-    const email = this.field(card, 'Email address', { type: 'email', autocomplete: 'email', inputMode: 'email' });
-    const pw = this.passwordField(card, 'Password', 'current-password');
-
-    const aux = document.createElement('div');
-    aux.className = 'mx-gate__aux';
-    aux.append(this.link('Forgot password?', () => this.screen('reset')));
-    card.append(aux);
-
-    const submit = this.button('Log in', 'primary', async () => {
-      if (!EMAIL_RE.test(email.value.trim())) return this.error(card, 'Please check your email address.');
-      if (!pw.value) return this.error(card, 'Please enter your password.');
-      submit.disabled = true;
-      try {
-        this.afterIdentity(await this.auth.passwordSignIn({
-          email: email.value.trim(), password: pw.value
-        }));
-      } catch (err) {
-        console.error('[auth] login', err);
-        // One message for a wrong address and a wrong password, so the screen
-        // can't be used to find out who has an account.
-        this.error(card, 'That email and password don\u2019t match. Check them, or reset your password.');
-      } finally {
-        submit.disabled = false;
-      }
-    });
-    card.append(submit);
-
-    // Enter submits, which is what a password field is expected to do.
     pw.addEventListener('keydown', e => { if (e.key === 'Enter') submit.click(); });
 
-    this.rule(card, 'or');
-    this.federated(card, true);
-
-    this.foot(card, 'New to Medixly?', 'Create an account', () => this.screen('welcome'), true);
-    this.fineprint(card);
-    return card;
+    // Carries what they already typed back with them, so Back is not a reset.
+    card.append(this.button('Back', 'ghost', () => this.screen('signup', data)));
+    return this.fineprint(card);
   }
 
-  resetScreen() {
+  resetScreen(data) {
+    const to = String(data?.to || '');
     const card = this.card('Reset your password',
       'We\u2019ll email you a link to set a new one. The link works once and expires in an hour.');
 
-    const email = this.field(card, 'Email address', { type: 'email', autocomplete: 'email', inputMode: 'email' });
+    const email = this.field(card, 'Email address',
+      { type: 'email', autocomplete: 'email', inputMode: 'email',
+        value: EMAIL_RE.test(to) ? to : '' });
 
     const send = this.button('Send the link', 'primary', async () => {
       if (!EMAIL_RE.test(email.value.trim())) return this.error(card, 'Please check your email address.');
@@ -681,16 +673,16 @@ class AuthGate {
       send.disabled = false;
     });
     card.append(send);
-    card.append(this.button('Back to log in', 'ghost', () => this.screen('login')));
+    card.append(this.button('Back', 'ghost', () => this.screen('identify', { to })));
     return this.fineprint(card);
   }
 
-  codeScreen() {
+  codeScreen(data) {
     const card = this.card('Send me a code',
       'We\u2019ll send a six digit code to the phone or email on your pharmacy file.');
 
     const input = this.field(card, 'Email address or mobile number',
-      { type: 'text', autocomplete: 'username' });
+      { type: 'text', autocomplete: 'username', value: String(data?.to || '') });
 
     const codeWrap = document.createElement('div');
     codeWrap.className = 'mx-gate__field';
@@ -718,7 +710,7 @@ class AuthGate {
         codeWrap.hidden = false;
         codeBox.focus();
         send.remove();
-        card.insertBefore(verify, card.querySelector('.mx-trust'));
+        card.insertBefore(verify, card.querySelector('.mx-gate__fine'));
       } catch {
         this.error(card, 'We couldn\u2019t send a code to that address. Check it and try again.');
       }
@@ -735,7 +727,7 @@ class AuthGate {
     });
 
     card.append(send);
-    card.append(this.button('Back', 'ghost', () => this.screen(this.profile ? 'login' : 'welcome')));
+    card.append(this.button('Back', 'ghost', () => this.screen('welcome')));
     return this.fineprint(card);
   }
 
@@ -763,8 +755,9 @@ class AuthGate {
         }
       }, 'fingerprint'));
     }
-    card.append(this.button('Use a code instead', 'outline', () => this.screen('code')));
-    card.append(this.button('Sign out', 'ghost', () => this.signOut()));
+    this.row(card,
+      this.button('Use a code', 'outline', () => this.screen('code')),
+      this.button('Sign out', 'ghost', () => this.signOut()));
     return card;
   }
 
@@ -800,19 +793,16 @@ class AuthGate {
    Auth transport contract — implement server-side and pass in as `auth`.
 
    currentSession()                      → { profile } | null
+   lookup({ to })                        → { known: boolean }
    signUp({ name, email, phone, password }) → { profile }
-   passwordSignIn({ email, password })   → { profile }
+   passwordSignIn({ to, password })      → { profile }
    requestPasswordReset({ email })       → { ok: true }
    googleSignIn()                        → { profile }
-   appleSignIn()                         → { profile }                optional
    requestCode({ to })                   → { ok: true }
    verifyCode({ code })                  → { profile }
    passkeyRegister()                     → { ok: true }
    passkeyAuth()                         → { profile }
    signOut()                             → { ok: true }
-
-   `appleSignIn` is the only optional one — leave it off the object and the
-   button doesn't render.
 
    profile = { id, name, email, phone, hasPasskey, guest, linked }
 
@@ -855,6 +845,22 @@ class AuthGate {
       session on a password change.
   12. A password alone should not be enough to read a transcript. On a new
       device require a second check — a passkey, or a code to the number on
-      file — exactly as the federated paths do. `linked: true` says the account
-      belongs to a patient; it does not say this device does.
+      file — exactly as Google does. `linked: true` says the account belongs to
+      a patient; it does not say this device does.
+
+   And two that `lookup` brings with it. It exists because a patient should not
+   have to remember whether they ever made an account here, which is a real
+   thing to fix. But it answers "is this person a patient at this pharmacy",
+   and §3 of docs/PIA.md is explicit that the fact of care is itself health
+   information. So:
+
+  13. Rate-limit `lookup` hard, per address and per IP, and return the same
+      shape and the same timing for known and unknown. Log every call. It is
+      an enumeration oracle by construction; treat it like one. When the limit
+      trips, fail rather than answer — the client falls back to the code path
+      on any error, so a blocked caller costs a real patient one extra step
+      and costs an attacker their whole method.
+  14. Better, when you can: skip `lookup` and always send a code. The code
+      proves the same thing and answers nothing. Keep the fallback in
+      identifyScreen() working, because that is what it is for.
    ═══════════════════════════════════════════════════════════════════ */

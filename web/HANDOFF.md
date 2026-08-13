@@ -25,7 +25,7 @@ don't merge into it.
 | `secure-chat.auth.css` | Sign-in card styling, plus the rules that hide the transcript for a guest, an unlinked account and the idle lock. | yes |
 | `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
 | `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | yes |
-| `secure-chat.auth.js` | `AuthGate`: sign-up, log in, password reset, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
+| `secure-chat.auth.js` | `AuthGate`: the identifier-first sign-in flow, password reset, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
 | `secure-chat.shop.js` | `MedixlyShop`: product search, basket, Shopify checkout. | yes |
 | `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
@@ -279,6 +279,23 @@ system answers the substantive part of any patient request.
    record attached. And `is-locked` is the strict one — it hides forms and the
    notice too, because a half-filled assessment is what a locked screen is for.
 
+   **One door, not two.** The welcome card is three buttons — phone or email,
+   Google, guest — and nothing else. There is no "log in" beside a "sign up",
+   because the patient does not know which one they are; people forget whether
+   they ever made an account. They give an identifier, `auth.lookup()` decides,
+   and the next card either asks for a password (returning) or finishes a
+   profile (new). Screens: `welcome → identify → password | signup → setpw`.
+
+   `lookup()` is the one piece of this that is a real trade. It answers "is
+   this person a patient at this pharmacy", and `docs/PIA.md` §3 treats the
+   fact of care as health information — so it is an enumeration oracle by
+   construction. Rules 13 and 14 in the file's footer are the price: hard rate
+   limits per address and per IP, identical shape and timing either way, every
+   call logged, and fail rather than answer when the limit trips. The client
+   falls back to the code path on *any* lookup error, so a blocked caller
+   costs a real patient one extra step and costs an attacker their method.
+   Keep that fallback working.
+
    **The card is sized to a phone, and the numbers are measured.** The thread
    window on a 664px Safari viewport is about 424px. The rule the layout is
    held to is not "the card fits" — on the welcome and log-in cards it does
@@ -290,6 +307,15 @@ system answers the substantive part of any patient request.
    That is what the `max-height:720px` block in the CSS is doing, and why the
    values in it are odd numbers rather than tokens. Re-measure after changing
    anything in these cards; the margin is single digits.
+
+   As of the identifier-first flow every card **fits** in that 424px window
+   with nothing below the fold — 391, 334, 395, 374 and 338px. Two things
+   bought the last of it. The new-patient profile is two cards rather than one
+   (name and contact, then password) because all four fields together came to
+   611px; and a card with two equal secondary actions puts them side by side
+   via `row()` rather than stacking, which is 50px that decides whether the
+   password card fits once Face ID is offered. Both are load-bearing, not
+   tidying.
 
    Never put the card back inside `[data-stream]`. `render()` calls
    `replaceChildren()` on that node and would delete it.

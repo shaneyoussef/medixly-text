@@ -356,22 +356,29 @@ const demoAuth = {
   // review. Return { profile } instead to boot straight into the chat.
   currentSession: () => wait(400, null),
 
+  // Which fork the identifier takes. maya@example.com and 416 555 0100 are
+  // "known" and land on the password card; anything else is treated as a new
+  // patient and lands on the profile card. Throw instead, and you get the
+  // code fallback — that path is worth exercising too.
+  lookup: ({ to }) => {
+    const known = ['maya@example.com', '4165550100'].includes(
+      tenDigits(to) || String(to).trim().toLowerCase());
+    console.log('[auth] lookup', to, '->', known ? 'known' : 'new');
+    return wait(600, { known });
+  },
+
   signUp: ({ name, email, phone }) => {
     console.log('[auth] signup', name, email, phone);
     // A real server returns linked:false here — a brand new account has not
     // been matched to a pharmacy record yet. Flip it to see that state.
     return wait(900, { profile: { ...demoPatient } });
   },
-  passwordSignIn: ({ email, password }) => password === 'wrongpassword'
+  passwordSignIn: ({ to, password }) => password === 'wrongpassword'
     ? Promise.reject(new Error('rejected, for testing the error path'))
     : wait(800, { profile: { ...demoPatient } }),
   requestPasswordReset: ({ email }) => { console.log('[auth] reset link to', email); return wait(700, { ok: true }); },
 
   googleSignIn: () => wait(700, { profile: { ...demoPatient } }),
-  // Present so the two-up Google/Apple row renders as designed. It is a stub
-  // like every other method here — the real Apple server half is not built,
-  // and deleting this key is what the gate looks like without one.
-  appleSignIn: () => wait(700, { profile: { ...demoPatient } }),
   requestCode: ({ to }) => { console.log('[auth] code sent to', to); return wait(700, { ok: true }); },
   verifyCode: ({ code }) => code === '000000'
     ? Promise.reject(new Error('rejected code, for testing the error path'))
