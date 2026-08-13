@@ -249,6 +249,11 @@ system answers the substantive part of any patient request.
    twelve rules in the `secure-chat.auth.js` footer are all outstanding server
    work; 7 to 12 exist only because there are now passwords.
 
+   Face ID appears on **log in and never on sign up**. `passkeyAuth()` asks the
+   device for a credential enrolled here earlier, so on a sign-up screen it can
+   only fail — it is a sign-in method, not a way to create an account.
+   Enrollment is offered once, on `passkeyScreen()`, after the record link.
+
    Two things about the gate are decisions, not styling. **A password is the
    one credential we store ourselves**, so it is the one that can leak — the
    code and passkey paths never had that exposure. And rule 12 is the one that

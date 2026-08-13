@@ -317,8 +317,14 @@ class AuthGate {
   /**
    * The methods that are the same on both front doors. A patient shouldn't
    * have to remember which screen offered Google.
+   *
+   * @param {boolean} [returning]  true on the screens for someone who already
+   *   has an account. Gates the passkey offer, which is a *sign-in* method and
+   *   nothing else: `passkeyAuth()` asks the device for a credential that was
+   *   enrolled here earlier, so on a sign-up screen it can only ever fail.
+   *   Enrollment is offered once, after the record link, on passkeyScreen().
    */
-  federated(card) {
+  federated(card, returning) {
     card.append(this.button(`Continue with Google`, 'outline', async () => {
       try {
         this.afterIdentity(await this.auth.googleSignIn());
@@ -343,7 +349,7 @@ class AuthGate {
 
     card.append(this.button('Email or text me a code', 'ghost', () => this.screen('code')));
 
-    if (this.canPasskey) {
+    if (returning && this.canPasskey) {
       card.append(this.button('Use Face ID or fingerprint', 'ghost', async () => {
         try {
           this.afterIdentity(await this.auth.passkeyAuth());
@@ -374,7 +380,8 @@ class AuthGate {
       'hero');
 
     card.append(this.button('Sign up with email', 'primary', () => this.screen('signup')));
-    this.federated(card);
+    // No passkey here: nobody arriving at a sign-up screen has one to use.
+    this.federated(card, false);
 
     this.rule(card, 'or');
 
@@ -467,7 +474,7 @@ class AuthGate {
     pw.addEventListener('keydown', e => { if (e.key === 'Enter') submit.click(); });
 
     this.rule(card, 'or');
-    this.federated(card);
+    this.federated(card, true);
 
     this.trust(card);
     this.foot(card, 'New to Medixly?', 'Create an account', () => this.screen('welcome'));
