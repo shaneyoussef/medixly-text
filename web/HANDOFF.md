@@ -279,6 +279,18 @@ system answers the substantive part of any patient request.
    record attached. And `is-locked` is the strict one — it hides forms and the
    notice too, because a half-filled assessment is what a locked screen is for.
 
+   **The card is sized to a phone, and the numbers are measured.** The thread
+   window on a 664px Safari viewport is about 424px. The rule the layout is
+   held to is not "the card fits" — on the welcome and log-in cards it does
+   not — it is that **every route out of the card clears the fold**: the
+   field, the primary button, Google, Apple and the switch to the other door.
+   Only the fine print is allowed below it. A route you have to scroll to find
+   is a route most people never take.
+
+   That is what the `max-height:720px` block in the CSS is doing, and why the
+   values in it are odd numbers rather than tokens. Re-measure after changing
+   anything in these cards; the margin is single digits.
+
    Never put the card back inside `[data-stream]`. `render()` calls
    `replaceChildren()` on that node and would delete it.
 

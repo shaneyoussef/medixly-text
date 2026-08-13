@@ -105,6 +105,7 @@ class AuthGate {
     const stream = log?.querySelector('[data-stream]');
     if (stream) log.insertBefore(this.layer, stream);
     else (log || host).append(this.layer);
+    this.gate(true);
 
     this.watchIdle();
     this.start();
@@ -120,6 +121,21 @@ class AuthGate {
       if (session?.profile) return this.ready(session.profile);
     } catch { /* fall through to the front door */ }
     this.screen('welcome');
+  }
+
+  /**
+   * Brings the card's top edge to the top of the thread.
+   *
+   * Deliberately not scrollIntoView(). That walks every scrollable ancestor,
+   * the document included, and on iOS Safari the document has a little travel
+   * in it — so it slid the whole page up and cut the pharmacy's name out of
+   * the header. Moving one box's scrollTop moves exactly the box that should
+   * move.
+   */
+  reveal() {
+    const log = this.host.querySelector('[data-log]');
+    if (!log || this.layer.hidden) return;
+    log.scrollTop += this.layer.getBoundingClientRect().top - log.getBoundingClientRect().top;
   }
 
   /** Shows or hides the card, and tells the shell which state it is in. */
@@ -202,12 +218,7 @@ class AuthGate {
     this.back = data?.back || null;
     this.layer.replaceChildren(build());
     this.layer.querySelector('input, button')?.focus({ preventScroll: true });
-    // Bring the card into view from its *top*, not by scrolling the thread to
-    // the bottom. These cards are taller than the log on a phone, and landing
-    // on a headline reads as an invitation where landing mid-form reads as
-    // paperwork.
-    requestAnimationFrame(() =>
-      this.layer.scrollIntoView({ block: 'start', behavior: 'auto' }));
+    requestAnimationFrame(() => this.reveal());
   }
 
   /* ── Card parts ──────────────────────────────────────────────── */
@@ -386,14 +397,44 @@ class AuthGate {
     this.anchor(card, box);
   }
 
-  trust(card) {
+  /**
+   * The fine print, as one block rather than the two stacked paragraphs this
+   * used to be. Four wrapped lines of grey at the foot of every card was most
+   * of what made them scroll, and none of it is what the patient came to read.
+   *
+   * Rendered as links only when `opts.legal` carries real URLs: a sentence
+   * claiming someone agreed to documents they cannot open is worse than no
+   * sentence, and these are documents PHIPA requires a custodian to publish.
+   */
+  fineprint(card) {
     const c = COUNTRY[this.opts.country] || COUNTRY.Canada;
+    const { terms, privacy } = this.opts.legal || {};
+
     const p = document.createElement('p');
-    p.className = 'mx-trust';
-    const span = document.createElement('span');
-    span.textContent =
-      `Your information is transmitted securely via ${c.platform} — ${c.law} compliant`;
-    p.append(icon('lock', true), span);
+    p.className = 'mx-gate__fine';
+
+    const doc = (label, href) => {
+      if (!href) return document.createTextNode(label);
+      const a = document.createElement('a');
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = label;
+      return a;
+    };
+
+    if (!terms || !privacy) {
+      console.warn('[SecureChat] no opts.legal.terms / opts.legal.privacy \u2014 ' +
+        'the agreement line is showing without links to the documents it names.');
+    }
+
+    p.append(
+      icon('lock', true),
+      document.createTextNode(`Encrypted, ${c.law} compliant. By continuing you agree to our `),
+      doc('Terms of Use', terms),
+      document.createTextNode(' and '),
+      doc('Privacy Notice', privacy),
+      document.createTextNode('.'));
     card.append(p);
     return card;
   }
@@ -460,42 +501,6 @@ class AuthGate {
     return row;
   }
 
-  /**
-   * The agreement line under the front doors. Rendered as links only when
-   * `opts.legal` carries real URLs: a sentence claiming someone agreed to
-   * documents they cannot open is worse than no sentence, and these are the
-   * documents PHIPA requires a custodian to publish.
-   */
-  legal(card) {
-    const { terms, privacy } = this.opts.legal || {};
-    const p = document.createElement('p');
-    p.className = 'mx-gate__legal';
-
-    const doc = (label, href) => {
-      if (!href) return document.createTextNode(label);
-      const a = document.createElement('a');
-      a.href = href;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.textContent = label;
-      return a;
-    };
-
-    if (!terms || !privacy) {
-      console.warn('[SecureChat] no opts.legal.terms / opts.legal.privacy \u2014 ' +
-        'the agreement line is showing without links to the documents it names.');
-    }
-
-    p.append(
-      document.createTextNode('By continuing you agree to our '),
-      doc('Terms of Use', terms),
-      document.createTextNode(' and '),
-      doc('Privacy Notice', privacy),
-      document.createTextNode('. Message and data rates apply.'));
-    card.append(p);
-    return p;
-  }
-
   loadingScreen() {
     const card = this.card('Just a moment');
     const dots = document.createElement('div');
@@ -510,7 +515,7 @@ class AuthGate {
   welcomeScreen() {
     const card = this.card(
       `Welcome to ${this.opts.pharmacyName}`,
-      'Refills, transfers and a pharmacist you can message, right in your pocket.',
+      'Refills, transfers and a pharmacist you can message.',
       'hero');
 
     // One field, either kind. People know their own number or their own
@@ -535,17 +540,16 @@ class AuthGate {
     // No passkey here: nobody arriving at a sign-up screen has one to use.
     this.oauthRow(card);
 
-    // Guest is intake only \u2014 no transcript, since that would expose health history.
-    card.append(this.button('Continue as guest', 'ghost', () =>
-      this.ready({ guest: true, name: '', email: '', phone: '' })));
-    const note = document.createElement('p');
-    note.className = 'mx-hint';
-    note.textContent = 'As a guest you can send a prescription or transfer request, but you won\u2019t see your message history.';
-    card.append(note);
-
-    this.trust(card);
     this.foot(card, 'Already have an account?', 'Log in', () => this.screen('login'), true);
-    this.legal(card);
+
+    // Guest is intake only \u2014 no transcript, since that would expose health
+    // history. It used to be a full-width button with a two-line explanation
+    // under it, which is a lot of card for the path fewest people want. The
+    // service rail already works without an account, so this is the reminder
+    // rather than the offer.
+    this.foot(card, 'Just sending one request?', 'Continue as guest', () =>
+      this.ready({ guest: true, name: '', email: '', phone: '' }));
+    this.fineprint(card);
     return card;
   }
 
@@ -560,7 +564,7 @@ class AuthGate {
     const asPhone = tenDigits(typed);
 
     const card = this.card('Create your account',
-      `We\u2019ll use this to reach you about your requests \u2014 nothing else.`, 'small');
+      'Only what we need to reach you about a request.');
 
     const name = this.field(card, 'Full name', { type: 'text', autocomplete: 'name' });
     const email = this.field(card, 'Email address',
@@ -578,7 +582,7 @@ class AuthGate {
 
     const hint = document.createElement('p');
     hint.className = 'mx-hint';
-    hint.textContent = `At least ${MIN_PASSWORD} characters. A short phrase you\u2019ll remember beats a scramble you won\u2019t.`;
+    hint.textContent = `At least ${MIN_PASSWORD} characters \u2014 a phrase you\u2019ll remember beats a scramble.`;
     card.append(hint);
 
     const submit = this.button('Create account', 'primary', async () => {
@@ -611,16 +615,15 @@ class AuthGate {
 
     card.append(this.button('Back', 'ghost', () => this.screen('welcome')));
 
-    this.trust(card);
     this.foot(card, 'Already have an account?', 'Log in', () => this.screen('login'), true);
-    this.legal(card);
+    this.fineprint(card);
     return card;
   }
 
   /* ── Front door: been here before ────────────────────────────── */
 
   loginScreen() {
-    const card = this.card('Log in', `Welcome back to ${this.opts.pharmacyName}.`, 'small');
+    const card = this.card('Log in', `Welcome back to ${this.opts.pharmacyName}.`);
 
     const email = this.field(card, 'Email address', { type: 'email', autocomplete: 'email', inputMode: 'email' });
     const pw = this.passwordField(card, 'Password', 'current-password');
@@ -655,9 +658,8 @@ class AuthGate {
     this.rule(card, 'or');
     this.federated(card, true);
 
-    this.trust(card);
     this.foot(card, 'New to Medixly?', 'Create an account', () => this.screen('welcome'), true);
-    this.legal(card);
+    this.fineprint(card);
     return card;
   }
 
@@ -680,7 +682,7 @@ class AuthGate {
     });
     card.append(send);
     card.append(this.button('Back to log in', 'ghost', () => this.screen('login')));
-    return this.trust(card);
+    return this.fineprint(card);
   }
 
   codeScreen() {
@@ -734,7 +736,7 @@ class AuthGate {
 
     card.append(send);
     card.append(this.button('Back', 'ghost', () => this.screen(this.profile ? 'login' : 'welcome')));
-    return this.trust(card);
+    return this.fineprint(card);
   }
 
   passkeyScreen(profile) {

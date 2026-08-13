@@ -10,7 +10,7 @@
    same Medixly tokens as everything else — no new colours, no new sizes.
    ─────────────────────────────────────────────────────────────────── */
 
-.mx-gate{display:block;padding:var(--space-2) 0 var(--space-4)}
+.mx-gate{display:block;padding:0 0 var(--space-4)}
 .mx-gate[hidden]{display:none}
 
 /* Slightly inset on the left, like an inbound bubble, so it belongs to the
@@ -22,7 +22,7 @@
 .mx-gate__card h2{font-family:var(--font-display);font-weight:var(--weight-semibold);
   font-size:var(--text-h2);letter-spacing:var(--tracking-tight);line-height:var(--leading-tight);
   color:var(--ink-900);margin:0}
-.mx-gate__blurb{margin:5px 0 var(--space-5);font-size:var(--text-sm);
+.mx-gate__blurb{margin:4px 0 var(--space-4);font-size:var(--text-sm);
   line-height:var(--leading-snug);color:var(--text-muted);text-wrap:pretty}
 
 /* The pharmacist, above the headline on both front doors.
@@ -38,10 +38,13 @@
    it is what stops the shelf behind her showing through her coat — so the
    .mx-icon trick of masking by alpha and tinting would flatten her into a
    silhouette. Learned the hard way. */
-.mx-gate__art{display:block;width:auto;height:196px;max-width:100%;
-  margin:0 auto var(--space-5);object-fit:contain}
+/* Only the welcome card carries it. The forms behind it are work, not
+   welcome, and 124px of decoration above four fields is what pushed the
+   Create account button off a phone screen. */
+.mx-gate__art{display:block;width:auto;height:150px;max-width:100%;
+  margin:0 auto var(--space-4);object-fit:contain}
 
-.mx-gate__art--sm{height:124px;margin-bottom:var(--space-4)}
+.mx-gate__art--sm{height:104px;margin-bottom:var(--space-3)}
 
 /* A soft amber halo behind her, lifted from --surface-glow, so she reads as
    part of the card's light. A sibling layer rather than her own background,
@@ -55,15 +58,41 @@
 .mx-gate__card:has(.mx-gate__art--sm)::before{height:150px}
 
 /* On a short phone the form matters more than the picture. */
+/* Short phones. The thread window on a 664px Safari viewport is about 424px,
+   and the card has to get Google, Apple and the log-in switch inside that —
+   those are real routes, not decoration, and a route you have to scroll to
+   find is a route most people don't take. So everything gives a little: the
+   picture most, then the gaps between blocks. Measured, not guessed; the
+   numbers below are what put the log-in switch back above the fold on an
+   iPhone 13. Only the fine print is allowed to fall past it. */
 @media (max-height:720px){
-  .mx-gate__art{height:140px}
-  .mx-gate__art--sm{display:none}
-  .mx-gate__card:has(.mx-gate__art--sm)::before{display:none}
+  .mx-gate__art{height:72px;margin-bottom:var(--space-3)}
+  .mx-gate__card:has(.mx-gate__art)::before{height:110px}
+  .mx-gate__card{padding:var(--space-4)}
+  .mx-gate__blurb{margin-bottom:var(--space-3)}
+  .mx-gate__rule{margin:var(--space-2) 0}
+  .mx-gate__foot{padding-top:6px}
+  .mx-gate__foot:first-of-type{margin-top:6px}
+  /* The row above the switch already has the card's own gap under it. */
+  .mx-gate__social .mx-gate__btn{margin-bottom:0}
+  .mx-gate__fine{margin-top:var(--space-2)}
+  .mx-gate__card h2{font-size:var(--text-h3)}
+  .mx-gate__field{margin-bottom:var(--space-2)}
+  .mx-gate__field .mx-label{margin-bottom:4px}
+  .mx-gate__btn{margin-bottom:6px}
+  .mx-gate__aux{margin-bottom:var(--space-2)}
+  .mx-gate__card .mx-hint{margin-bottom:var(--space-2)}
+}
+
+/* Landscape, or a very short window: the picture goes entirely. */
+@media (max-height:560px){
+  .mx-gate__art{display:none}
+  .mx-gate__card:has(.mx-gate__art)::before{display:none}
 }
 
 /* Fields are labelled here, unlike the old placeholder-only version — a
    password manager needs a label to fill, and so does a screen reader. */
-.mx-gate__field{margin-bottom:var(--space-4)}
+.mx-gate__field{margin-bottom:var(--space-3)}
 .mx-gate__field[hidden]{display:none}
 .mx-gate__field .mx-label{margin-bottom:6px;font-size:var(--text-xs);
   letter-spacing:var(--tracking-wide);text-transform:uppercase;color:var(--text-label);
@@ -91,9 +120,12 @@
 .mx-gate__link:hover{color:var(--text-link-hover)}
 .mx-gate__link .mx-icon{background-color:currentColor;text-decoration:none}
 
-.mx-gate__foot{margin:var(--space-4) 0 0;padding-top:var(--space-4);
-  border-top:1px solid var(--border-subtle);text-align:center;
+/* Only the first one wears the rule, so two stacked switches read as one
+   block rather than a stack of fences. */
+.mx-gate__foot{margin:0;padding-top:var(--space-3);text-align:center;
   font-size:var(--text-sm);color:var(--text-muted)}
+.mx-gate__foot:first-of-type{margin-top:var(--space-3);
+  border-top:1px solid var(--border-subtle)}
 
 /* Google and Apple share a row: two short labels beside their own marks read
    faster than two full-width "Continue with ..." bars. With only one wired up
@@ -105,16 +137,22 @@
    client that opts out of currentColor. */
 .mx-brand{width:18px;height:18px;flex:0 0 auto}
 
-/* Deliberately not --text-subtle, which the trust line uses. This sentence is
-   the one the patient is being held to, and at #9AA0A6 on white it sits around
-   2.6:1 — under WCAG AA for body text. Legalese is set small; it does not get
-   to be set faint as well. */
-.mx-gate__legal{margin:var(--space-3) 0 0;text-align:center;
+/* The security line and the agreement line, merged. They used to be two
+   paragraphs wrapping to four lines between them, which was most of the reason
+   these cards scrolled — and neither is what the patient opened the app to
+   read. One block, one lock, one sentence.
+
+   Deliberately not --text-subtle. This is the sentence the patient is being
+   held to, and at #9AA0A6 on white it sits around 2.6:1 — under WCAG AA for
+   body text. Legalese is set small; it does not get to be set faint as well. */
+.mx-gate__fine{display:block;margin:var(--space-3) 0 0;text-align:center;
   font-size:var(--text-xs);line-height:var(--leading-snug);color:var(--text-muted);
   text-wrap:pretty}
-.mx-gate__legal a{color:var(--text-link);text-decoration:underline;
+.mx-gate__fine .mx-icon{display:inline-block;vertical-align:-2px;margin-right:4px;
+  background-color:var(--ink-400)}
+.mx-gate__fine a{color:var(--text-link);text-decoration:underline;
   text-underline-offset:2px}
-.mx-gate__legal a:hover{color:var(--text-link-hover)}
+.mx-gate__fine a:hover{color:var(--text-link-hover)}
 
 .mx-gate__code{font-variant-numeric:tabular-nums;font-size:var(--text-h3);text-align:center;
   letter-spacing:.3em}
@@ -139,7 +177,7 @@
   color:var(--text-muted);font-weight:var(--weight-regular)}
 .mx-gate__btn--ghost:hover{background:#fff}
 
-.mx-gate__rule{display:flex;align-items:center;gap:var(--space-3);margin:var(--space-4) 0}
+.mx-gate__rule{display:flex;align-items:center;gap:var(--space-3);margin:var(--space-3) 0}
 .mx-gate__rule::before,.mx-gate__rule::after{content:"";flex:1;height:1px;background:rgba(26,34,37,.1)}
 .mx-gate__rule span{font-weight:var(--weight-medium);font-size:var(--text-xs);
   letter-spacing:var(--tracking-wide);text-transform:uppercase;color:var(--text-label)}
@@ -147,9 +185,8 @@
 .mx-gate__err{margin:0 0 var(--space-3)}
 .mx-gate__note{margin:0 0 var(--space-3);font-size:var(--text-sm);
   line-height:var(--leading-snug);color:var(--success-600)}
-.mx-gate__card .mx-trust{padding-top:var(--space-4)}
 .mx-gate__card .mx-typing{margin:0 auto}
-.mx-gate__card .mx-hint{margin-top:calc(var(--space-2) * -1);margin-bottom:var(--space-4);
+.mx-gate__card .mx-hint{margin-top:calc(var(--space-1) * -1);margin-bottom:var(--space-3);
   text-align:center}
 
 /* Guest is intake only: no message history, but the cards they came to use
