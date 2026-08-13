@@ -275,8 +275,9 @@ const demoTransport = {
     console.log('[SecureChat] POST /api/submit', body);
 
     await wait(900);
-    setTimeout(() => chat.setTyping(true), 900);
-    setTimeout(() => chat.receive({ text: FORMS[payload.form].done(payload.values).note }), 2400);
+    // No follow-up message. The receipt card that paintSubmitted() draws
+    // already carries `note` at the bottom of it, so echoing the same
+    // sentence as a bubble said everything twice, one card apart.
     return { reference: 'DEMO-00000', status: 'received' };
   },
 

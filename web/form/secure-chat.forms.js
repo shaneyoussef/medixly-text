@@ -207,7 +207,11 @@ const FORMS = {
     ],
     done: () => ({
       title: 'Transfer request sent',
-      note: 'We\u2019ll contact your current pharmacy and message you here once your prescriptions are with us. This usually takes 1\u20132 business days.'
+      // No time estimate here. A transfer waits on the *other* pharmacy
+      // answering, which is not ours to promise \u2014 and a missed promise is
+      // what turns a patient into a phone call. Urgency without a deadline:
+      // we start now, and they hear from us the moment it lands.
+      note: 'We\u2019re on it right away. We\u2019ll contact your current pharmacy and message you here the moment your prescriptions are with us.'
     })
   },
 

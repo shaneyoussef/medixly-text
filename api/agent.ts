@@ -156,7 +156,7 @@ const FORM_FOR: Partial<Record<Intent, FormId>> = {
    ─────────────────────────────────────────────────────────────────── */
 const REPLY: Record<Exclude<Intent, "UNCLEAR">, Record<Channel, string>> = {
   TRANSFER: {
-    web: "Happy to help you move your prescriptions over. Fill this in and we’ll take it from there — it usually takes 1–2 business days once we have it.",
+    web: "Happy to help you move your prescriptions over. Fill this in and we’ll get straight onto it.",
     sms: "Happy to help you move your prescriptions over. Start here and we’ll take it from there:",
   },
   REFILL: {
