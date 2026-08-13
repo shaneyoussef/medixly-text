@@ -335,16 +335,30 @@ system answers the substantive part of any patient request.
    password card fits once Face ID is offered. Both are load-bearing, not
    tidying.
 
-   **The shell is sized from `visualViewport`, not `100dvh`.** `100dvh` counts
-   the browser chrome but not the keyboard: on iOS the layout viewport does
-   not shrink when the keyboard opens, so the bottom of the shell slides under
-   it and Safari scrolls the page to rescue the focused field. That is where
-   the dead band between the message bar and the keyboard came from, and it is
-   the same mechanism that used to push the pharmacy's name off the top.
-   `trackViewport()` writes `--vvh`, `body` and `.mx-chat` read it, `body` is
-   `overflow:hidden`, and the document has nothing left to scroll — only the
-   thread does. `100dvh` stays as the fallback for browsers without
-   `visualViewport`.
+   **The shell is pinned to `visualViewport`, not sized by `100dvh`.**
+   `100dvh` counts the browser chrome but not the keyboard: on iOS the layout
+   viewport does not shrink when the keyboard opens, so the bottom of the
+   shell slides under it and Safari scrolls the page to rescue the focused
+   field. That is where the dead band between the message bar and the keyboard
+   came from, and it is the same mechanism that used to push the pharmacy's
+   name off the top.
+
+   `trackViewport()` writes **two** properties and `.mx-chat` is
+   `position:fixed` reading both — `--vvh` for how tall the visible region is,
+   `--vvtop` for how far down the page it starts. Height alone is not enough,
+   and shipping it that way blanked the screen: when Safari scrolls, the
+   visible region moves *down* the page, and a shell in normal flow scrolls
+   away above it leaving nothing but background. Fixed plus both properties
+   means it cannot be scrolled off. There is deliberately no `window.scrollTo`
+   undoing Safari's scroll — fighting the browser mid-gesture is what made it
+   worse. Let it scroll; follow it.
+
+   Both properties fall back to a full-height shell at the top of the page,
+   which is what browsers without `visualViewport` get.
+
+   `kb2.mjs`-style checks must model **both** the shrink and the slide. The
+   first version of that test only modelled the shrink, which is precisely why
+   the bug shipped.
 
    It also sets `is-keyboard` on the shell, which drops the composer's 30px
    bottom padding. That padding is there to clear the home indicator, and the

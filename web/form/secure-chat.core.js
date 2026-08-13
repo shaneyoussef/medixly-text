@@ -57,18 +57,29 @@ function tenDigits(value) {
 }
 
 /**
- * Keeps the shell the size of what the patient can actually see.
+ * Keeps the shell the size and position of what the patient can actually see.
  *
- * `100dvh` is the viewport with the browser chrome accounted for — but not the
- * keyboard. On iOS Safari the layout viewport does not shrink when the
- * keyboard opens, so the shell stays full height, the bottom of it slides
- * under the keyboard, and Safari scrolls the page to rescue the focused
- * field. That is where the dead band between the message bar and the keyboard
- * came from, and it is also what used to push the pharmacy's name off the top.
+ * `100dvh` counts the browser chrome but not the keyboard. On iOS the layout
+ * viewport does not shrink when the keyboard opens, so a full-height shell has
+ * its bottom slide underneath the keyboard, and Safari scrolls the page to
+ * rescue the focused field. That is where the dead band between the message
+ * bar and the keyboard came from.
  *
- * `visualViewport` is the part actually on screen, keyboard subtracted. Track
- * it and the composer sits on the keyboard, the header stays put, and the
- * document has nothing left to scroll.
+ * `visualViewport` is the part actually on screen, keyboard subtracted — but
+ * height alone is not enough, and getting that wrong blanked the screen once.
+ * When Safari scrolls, the visible region moves *down* the page: a shell in
+ * normal flow scrolls away above it, leaving nothing but background. Two
+ * things fix it together, and both are needed.
+ *
+ *   `--vvh`   how tall the visible region is
+ *   `--vvtop` how far down the page it starts
+ *
+ * The shell is `position: fixed` and reads both, so it is pinned to whatever
+ * is on screen and cannot be scrolled off it. Note what is *not* here: no
+ * `window.scrollTo` to undo Safari's scroll. Fighting the browser mid-gesture
+ * is what made this worse rather than better. Let it scroll; follow it.
+ *
+ * Both custom properties fall back to a visible layout if this never runs.
  *
  * @param {HTMLElement} root
  * @param {() => void} [onResize]  called after each change, to re-pin the log
@@ -81,15 +92,13 @@ function trackViewport(root, onResize) {
   const apply = () => {
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
-      document.documentElement.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+      const style = document.documentElement.style;
+      style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+      style.setProperty('--vvtop', `${Math.round(vv.offsetTop)}px`);
       // A keyboard is the only thing that takes this much of the screen. The
       // composer's resting padding exists to clear the home indicator, which
       // is not on screen while the keyboard is, so it gives that space back.
       root.classList.toggle('is-keyboard', window.innerHeight - vv.height > 120);
-      // Safari may already have scrolled the document to reveal the focused
-      // field. Once the shell is exactly the visible height there is nothing
-      // to reveal, so undo it.
-      if (vv.offsetTop || window.scrollY) window.scrollTo(0, 0);
       onResize?.();
     });
   };

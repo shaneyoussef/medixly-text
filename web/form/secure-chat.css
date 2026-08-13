@@ -1,12 +1,10 @@
 *,*::before,*::after{box-sizing:border-box}
 /* Full bleed. This is a messaging app, not a device mockup — it fills the
    window on a phone and on a desktop alike, the way a messenger does. */
-/* --vvh is the visual viewport height, set by trackViewport() in
-   secure-chat.core.js — the screen minus the keyboard, which 100dvh does not
-   account for on iOS. The dvh is the fallback for browsers without
-   visualViewport. Fixed height plus overflow:hidden means the document itself
-   never scrolls: only the thread does. */
-body{margin:0;background:var(--surface-page);height:var(--vvh,100dvh);overflow:hidden}
+/* The shell is taken out of flow below, so the document has nothing to scroll
+   and nothing to size to. */
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--surface-page)}
 button,textarea{font-family:inherit}
 
 /* ── Icons: Lucide, masked so they inherit currentColor (Icon.jsx) ─── */
@@ -18,7 +16,19 @@ button,textarea{font-family:inherit}
 .mx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* ── Shell ─────────────────────────────────────────────────────────── */
-.mx-chat{position:relative;display:flex;flex-direction:column;width:100%;height:var(--vvh,100dvh);
+/* Pinned to the visible region rather than to the page.
+
+   --vvh and --vvtop are written by trackViewport() in secure-chat.core.js:
+   how tall the on-screen area is with the keyboard subtracted, and how far
+   down the page it starts. Height alone is not enough — when iOS scrolls to
+   reveal a focused field the visible region moves down the page, and a shell
+   in normal flow scrolls away above it. That blanked the screen once. Fixed
+   plus both properties means it cannot be scrolled off.
+
+   Both fall back to a full-height shell at the top of the page, which is what
+   browsers without visualViewport get. */
+.mx-chat{position:fixed;top:var(--vvtop,0px);left:0;right:0;
+  display:flex;flex-direction:column;width:100%;height:var(--vvh,100dvh);
   background:var(--surface-glow);color:var(--ink-900);overflow:hidden}
 
 /* Wide windows get a reading measure so lines don't run the full desktop, but
