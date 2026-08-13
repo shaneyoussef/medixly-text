@@ -25,7 +25,7 @@ don't merge into it.
 | `secure-chat.auth.css` | Sign-in gate styling. | yes |
 | `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
 | `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | yes |
-| `secure-chat.auth.js` | `AuthGate`: sign-up, log in, password reset, patient-record link, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
+| `secure-chat.auth.js` | `AuthGate`: sign-up, log in, password reset, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
 | `secure-chat.shop.js` | `MedixlyShop`: product search, basket, Shopify checkout. | yes |
 | `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
@@ -263,6 +263,20 @@ system answers the substantive part of any patient request.
    PHIPA requires (see `../docs/privacy-documents.md`). **Neither page exists
    yet.**
 
+   **Nothing asks for a health card number or a date of birth.** There was a
+   "Confirm it's you" screen that did, standing between signing up and seeing
+   any messages, and it is gone. It collected the one identifier `docs/PIA.md`
+   §4 says is never collected, and it wasn't even a good check — those two
+   details are exactly what someone impersonating a patient would already have.
+
+   What replaced it is `profile.linked`. A new account is `linked: false`,
+   opens the chat, and sees **no message history** (`is-unlinked`, the same CSS
+   rule as guest mode). Requests still go through, because every form carries
+   its own identity fields and its own consent. The pharmacy attaches the
+   record from their side, against someone they have already identified. Do not
+   reintroduce a self-serve link endpoint — that is a lookup against real
+   patient records with attacker-supplied details.
+
    Face ID appears on **log in and never on sign up**. `passkeyAuth()` asks the
    device for a credential enrolled here earlier, so on a sign-up screen it can
    only fail — it is a sign-in method, not a way to create an account.
@@ -282,7 +296,8 @@ system answers the substantive part of any patient request.
    not deployed, does not persist the thread, has no rate limit, and its
    `escalate` flag has nowhere to land — see the footer of that file.
 
-   Still to build: the auth contract endpoints, `GET /api/chat/stream` (SSE),
+   Still to build: the auth contract endpoints, a way for staff to set
+   `linked` on an account, `GET /api/chat/stream` (SSE),
    `POST /api/chat/upload`, `POST /api/forms/:id/sheet`, and
    `GET /api/patients/:id/export`. Apply the twelve numbered rules in the
    `secure-chat.auth.js` footer — security requirements, not suggestions.

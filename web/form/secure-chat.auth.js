@@ -7,8 +7,11 @@
      login    →  been here before. Email and password, or any of the above.
 
    Plus the screens that hang off them — email/SMS code, password reset,
-   the patient-record link, passkey enrollment and the idle lock. Renders
-   over the chat shell and reveals it only once there's a verified session.
+   passkey enrollment and the idle lock. Renders over the chat shell and
+   reveals it only once there's a verified session.
+
+   Nothing here asks for a health card number or a date of birth. See the
+   note on afterIdentity() for what replaced that, and why.
 
    All I/O goes through the `auth` object — see the contract at the bottom.
    Nothing here trusts the client: every check is re-run server-side.
@@ -107,7 +110,10 @@ class AuthGate {
     this.opts.onSession?.(profile);
     this.opts.chat?.setProfile?.(profile);
     this.layer.hidden = true;
+    // Both states hide the transcript: a guest has no record, and an
+    // unlinked account has not been matched to one yet.
     this.host.classList.toggle('is-guest', !!profile.guest);
+    this.host.classList.toggle('is-unlinked', !profile.guest && !profile.linked);
     this.touch();
   }
 
@@ -151,7 +157,6 @@ class AuthGate {
       login:   () => this.loginScreen(),
       reset:   () => this.resetScreen(),
       code:    () => this.codeScreen(data),
-      link:    () => this.linkScreen(),
       passkey: () => this.passkeyScreen(data),
       locked:  () => this.lockedScreen()
     }[name];
@@ -688,35 +693,6 @@ class AuthGate {
     return this.trust(card);
   }
 
-  /**
-   * A Google account, an Apple account, a password or a verified code proves
-   * control of an address — not that the person is this patient. Linking
-   * checks details only the patient and the pharmacy share before any
-   * history is shown.
-   */
-  linkScreen() {
-    const card = this.card('Confirm it\u2019s you',
-      'Enter these once and we\u2019ll connect you to your pharmacy record.');
-
-    const health = this.field(card, 'Health card number', { type: 'text' });
-    const dob = this.field(card, 'Date of birth', { type: 'date' });
-
-    card.append(this.button('Confirm', 'primary', async () => {
-      if (!health.value.trim() || !dob.value) {
-        return this.error(card, 'Please enter both your health card number and date of birth.');
-      }
-      try {
-        const res = await this.auth.linkPatient({ healthCard: health.value.trim(), dob: dob.value });
-        if (!res?.profile) throw new Error('no profile');
-        this.offerPasskey(res.profile);
-      } catch {
-        // Deliberately vague: a precise message would let someone probe records.
-        this.error(card, 'Those details don\u2019t match a record we hold. Check them, or call us at [Phone Number].');
-      }
-    }));
-    return this.trust(card);
-  }
-
   passkeyScreen(profile) {
     const card = this.card('Skip this next time?',
       'Use Face ID or your fingerprint to open your messages. Your biometrics stay on your device — we only store a key.');
@@ -749,9 +725,23 @@ class AuthGate {
 
   /* ── Routing after an identity check ─────────────────────────── */
 
+  /**
+   * Signing in proves control of an address. It does not prove the person is
+   * a particular patient of this pharmacy, and there is no question this
+   * screen could ask that would — a health card number and a date of birth
+   * are exactly the details someone impersonating a patient is most likely to
+   * have, and asking a new customer for them at the door is both frightening
+   * and, per docs/PIA.md \u00a74, information this system does not collect.
+   *
+   * So the account opens either way, and `profile.linked` carries the answer:
+   * false means no pharmacy record is attached yet, and the transcript stays
+   * hidden exactly as it does for a guest. Requests still go through, because
+   * every form collects and consents to its own identity fields. Linking is
+   * the pharmacy's job, done from their side against a record they already
+   * hold \u2014 not a quiz at the front door.
+   */
   afterIdentity(res) {
-    if (!res) return;
-    if (res.needsLink || !res.profile) return this.screen('link');
+    if (!res?.profile) return;
     this.offerPasskey(res.profile);
   }
 
@@ -765,22 +755,26 @@ class AuthGate {
    Auth transport contract — implement server-side and pass in as `auth`.
 
    currentSession()                      → { profile } | null
-   signUp({ name, email, password })     → { profile } | { needsLink: true }
-   passwordSignIn({ email, password })   → { profile } | { needsLink: true }
+   signUp({ name, email, phone, password }) → { profile }
+   passwordSignIn({ email, password })   → { profile }
    requestPasswordReset({ email })       → { ok: true }
-   googleSignIn()                        → { profile } | { needsLink: true }
-   appleSignIn()                         → { profile } | { needsLink: true }   optional
+   googleSignIn()                        → { profile }
+   appleSignIn()                         → { profile }                optional
    requestCode({ to })                   → { ok: true }
-   verifyCode({ code })                  → { profile } | { needsLink: true }
-   linkPatient({ healthCard, dob })      → { profile }
+   verifyCode({ code })                  → { profile }
    passkeyRegister()                     → { ok: true }
-   passkeyAuth()                         → { profile } | { needsLink: true }
+   passkeyAuth()                         → { profile }
    signOut()                             → { ok: true }
 
    `appleSignIn` is the only optional one — leave it off the object and the
    button doesn't render.
 
-   profile = { id, name, email, phone, dob, healthCard, hasPasskey, guest }
+   profile = { id, name, email, phone, hasPasskey, guest, linked }
+
+   `linked` is whether this account has been matched to a pharmacy record.
+   The client shows no message history until it is true. There is no
+   `healthCard` and no `dob`: the gate does not ask for either, and the server
+   should not send them back.
 
    Non-negotiables for whoever builds the server half:
 
@@ -792,8 +786,11 @@ class AuthGate {
       two records for one person, their medication history splits in half.
    4. Keep a second factor enrolled alongside any passkey. A lost phone must
       not lock a patient out of their own records.
-   5. Rate-limit linkPatient and keep its failure message vague — it is a
-      lookup against real patient records.
+   5. Linking an account to a patient record happens on the pharmacy's side,
+      against a person they have already identified. Never expose it as a
+      self-serve endpoint the client can call with guessed details — that is a
+      lookup against real patient records, and the reason the front door no
+      longer asks for a health card number.
    6. Never prefill consent or the assessment signature from a profile. Each
       submission needs its own consent record and its own timestamp.
 
@@ -811,7 +808,8 @@ class AuthGate {
       successful login or a second reset request. Never email the password.
   11. Rotate the session on login and on password change, and end every other
       session on a password change.
-  12. A password alone should not be enough to read a transcript. Require the
-      patient-record link (or a passkey) on a new device, exactly as the
-      federated paths do.
+  12. A password alone should not be enough to read a transcript. On a new
+      device require a second check — a passkey, or a code to the number on
+      file — exactly as the federated paths do. `linked: true` says the account
+      belongs to a patient; it does not say this device does.
    ═══════════════════════════════════════════════════════════════════ */

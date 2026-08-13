@@ -338,36 +338,40 @@ const demoPatient = {
   name: 'Maya Halloran',
   email: 'maya@example.com',
   phone: '416 555 0100',
-  dob: '1988-04-12',
-  healthCard: '1234-567-890-AB',
   hasPasskey: false,
-  guest: false
+  guest: false,
+  // Whether a pharmacy record is attached. The demo says yes so the seeded
+  // thread is visible; a real new sign-up starts false and sees no history
+  // until the pharmacy links them from their side. No `dob`, no `healthCard` —
+  // the gate asks for neither, so the server should never return them.
+  linked: true
 };
 
 const demoAuth = {
-  // null so every reload lands on sign-in — that's the screen under review.
-  // Return { profile } instead to boot straight into the chat.
+  // null so every reload lands on the front door — that's the screen under
+  // review. Return { profile } instead to boot straight into the chat.
   currentSession: () => wait(400, null),
 
-  // An email and password prove control of an address, same as Google does —
-  // not that the person is this patient. Every path lands on the link screen.
-  signUp: ({ name, email }) => { console.log('[auth] signup', name, email); return wait(900, { needsLink: true }); },
+  signUp: ({ name, email, phone }) => {
+    console.log('[auth] signup', name, email, phone);
+    // A real server returns linked:false here — a brand new account has not
+    // been matched to a pharmacy record yet. Flip it to see that state.
+    return wait(900, { profile: { ...demoPatient } });
+  },
   passwordSignIn: ({ email, password }) => password === 'wrongpassword'
     ? Promise.reject(new Error('rejected, for testing the error path'))
-    : wait(800, { needsLink: true }),
+    : wait(800, { profile: { ...demoPatient } }),
   requestPasswordReset: ({ email }) => { console.log('[auth] reset link to', email); return wait(700, { ok: true }); },
 
-  googleSignIn: () => wait(700, { needsLink: true }),
+  googleSignIn: () => wait(700, { profile: { ...demoPatient } }),
   // Present so the two-up Google/Apple row renders as designed. It is a stub
   // like every other method here — the real Apple server half is not built,
   // and deleting this key is what the gate looks like without one.
-  appleSignIn: () => wait(700, { needsLink: true }),
+  appleSignIn: () => wait(700, { profile: { ...demoPatient } }),
   requestCode: ({ to }) => { console.log('[auth] code sent to', to); return wait(700, { ok: true }); },
   verifyCode: ({ code }) => code === '000000'
     ? Promise.reject(new Error('rejected code, for testing the error path'))
-    : wait(700, { needsLink: true }),
-
-  linkPatient: ({ healthCard, dob }) => wait(900, { profile: { ...demoPatient, healthCard, dob } }),
+    : wait(700, { profile: { ...demoPatient } }),
 
   passkeyRegister: () => wait(600, { ok: true }),
   passkeyAuth: () => wait(600, { profile: { ...demoPatient, hasPasskey: true } }),

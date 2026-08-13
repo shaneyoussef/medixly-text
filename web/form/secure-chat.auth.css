@@ -146,8 +146,17 @@
 /* Guest is intake only: no message history, but the cards they came to use
    have to stay. Form and shop cards are exempt — hiding those would leave a
    guest with a rail that opens nothing. Same rule during checkout, where the
-   health conversation has no business sitting behind a payment surface. */
+   health conversation has no business sitting behind a payment surface.
+
+   `is-unlinked` is the same rule for a signed-in account that hasn't been
+   matched to a pharmacy record yet. Signing in proves someone controls an
+   email address; it does not prove they are a given patient, and a transcript
+   is the one thing on this surface that would leak somebody else's care if
+   that guess were wrong. They can still send requests — the forms carry their
+   own identity fields and their own consent. */
 .is-guest .mx-log .mx-msg:not(.mx-msg--form),
 .is-guest .mx-jump,
+.is-unlinked .mx-log .mx-msg:not(.mx-msg--form),
+.is-unlinked .mx-jump,
 .is-checkout .mx-log .mx-msg:not(.mx-msg--form),
 .is-checkout .mx-jump{display:none}

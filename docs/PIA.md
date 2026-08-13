@@ -120,6 +120,17 @@ Per form:
 Enforced twice — the client asks for none of them, and the API declares a
 whitelist per form and discards everything else before storage.
 
+The sign-in gate briefly broke this rule and no longer does. It carried a
+"Confirm it's you" screen asking for a health card number and a date of birth
+before any message history would open. Two things were wrong with it. It
+collected the one identifier this section says is never collected, on the very
+first screen a new customer sees. And it did not work as a safeguard: a health
+card number and a date of birth are precisely the details someone impersonating
+a patient is most likely to already hold, so the screen imposed the fear of a
+records check without the strength of one. Matching an account to a patient
+record is now the pharmacy's own act, performed against a person they have
+already identified, and no client-callable endpoint does it.
+
 Medication names are the one worth spelling out, because two forms nearly needed
 them and don't. Transfer asks whether to move all prescriptions or only some, and
 never which; refill takes the number off the label and offers no "or describe it"
@@ -154,15 +165,22 @@ the others leave verification with Google, Apple, the carrier or the device.
 | Email address | Yes | Also the account identifier |
 | Password | As an Argon2id hash, never in plaintext, never recoverable | New with the login screen; see risk 21 |
 | Password reset token | Hashed, single use, one hour | Never emailed as a password |
+| Whether the account is linked to a patient record | Yes, one boolean | No record is opened to the account until it is true |
 | Passkey public key and credential ID | Yes | The private key and any biometric stay on the device — Medixly never receives either |
 | Google / Apple subject identifier | Yes | The link between their account and ours. No password crosses over |
 
 None of this is PHI on its own, but all of it opens PHI, so it lives under the
-same retention and audit rules as the records it protects. Two consequences worth
-stating: **whether an address has an account is itself PHI** — it says someone is
-a patient here — so sign-up, login and reset all answer the same way for a known
-and an unknown address; and a password alone is a weaker check than the paths
-beside it, so it does not by itself open a transcript on a new device.
+same retention and audit rules as the records it protects. Three consequences
+worth stating. **Whether an address has an account is itself PHI** — it says
+someone is a patient here — so sign-up, login and reset all answer the same way
+for a known and an unknown address. A password alone is a weaker check than the
+paths beside it, so it does not by itself open a transcript on a new device.
+And **an account is not a patient**: signing in proves control of an email
+address and nothing more, so a new account carries `linked: false` and sees no
+message history at all. It can still submit requests, because each form collects
+and consents to its own identity fields. This is what replaced the health card
+screen described above, and it is the stronger of the two — it withholds the
+record rather than guarding it with a question an impersonator could answer.
 
 ---
 
