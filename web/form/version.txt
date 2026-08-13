@@ -1,0 +1,24 @@
+cc16c59  2026-08-13 19:38  Make the first pill a bar to type in
+
+What this file is for
+---------------------
+There is no build step and no content hash in the asset filenames, so
+"the deploy didn't land" and "my browser kept the old file" look
+identical from a phone. This file separates them in one tap.
+
+Open  medixly.netlify.app/version.txt  and read the first line.
+
+  It matches the newest commit  ->  Netlify has the new build. Anything
+                                    old on screen is the browser holding
+                                    a cached copy. Close the tab
+                                    completely and open a fresh one, or
+                                    use a private tab.
+
+  It is behind, or 404s        ->  Netlify has not deployed. Check the
+                                    Deploys tab: is it building, has it
+                                    failed, is auto-publish off, is the
+                                    site watching a branch other than
+                                    main?
+
+It is a new URL rather than one of the cached ones, so it is always
+fetched fresh. Update the first line whenever you push.

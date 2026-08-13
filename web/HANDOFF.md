@@ -30,6 +30,7 @@ don't merge into it.
 | `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
 | `secure-chat.demo.js` | Stub transport, the submission mapper, boot. Replace the transport to go live; keep the mapper. | yes |
+| `version.txt` | One line naming the deployed commit. Open `/version.txt` to tell a stale deploy apart from a stale browser cache. Update it when you push. | yes |
 | `img/pharmacist.png` | The illustration on the sign-up and log-in screens. Recoloured to the palette before it was committed — see below. | yes |
 
 The agent routes and a pharmacist answers whatever it hands over. It never
