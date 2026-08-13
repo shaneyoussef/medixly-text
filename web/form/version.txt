@@ -1,4 +1,4 @@
-4230a1b  2026-08-13 20:46  Put the message bar on the keyboard
+8b42c41  2026-08-13 20:58  Pin the shell to the visible region, not just its height
 
 What this file is for
 ---------------------
