@@ -1,4 +1,4 @@
-cc16c59  2026-08-13 19:38  Make the first pill a bar to type in
+160519f  2026-08-13 20:29  Lock the chat until they choose how to come in
 
 What this file is for
 ---------------------
