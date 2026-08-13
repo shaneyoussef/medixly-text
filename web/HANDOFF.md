@@ -22,7 +22,7 @@ don't merge into it.
 | `index.html` | Shell. Markup only, loads everything below. | yes |
 | `ds-tokens.css` | Copy of the Medixly design tokens so the page opens standalone. In the app, drop it and link the real design system. | yes |
 | `secure-chat.css` | All chat styling. | yes |
-| `secure-chat.auth.css` | Sign-in gate styling. | yes |
+| `secure-chat.auth.css` | Sign-in card styling, plus the rules that hide the transcript for a guest, an unlinked account and the idle lock. | yes |
 | `secure-chat.core.js` | Helpers plus the `SecureChat` class — all UI behaviour. Read this first. | yes |
 | `secure-chat.forms.js` | Form schemas, service rail, consent block. Most content edits happen here. | yes |
 | `secure-chat.auth.js` | `AuthGate`: sign-up, log in, password reset, passkeys, guest mode, idle lock. Transport contract at the bottom. | yes |
@@ -262,6 +262,25 @@ system answers the substantive part of any patient request.
    open is worse than no sentence, and these are two of the four documents
    PHIPA requires (see `../docs/privacy-documents.md`). **Neither page exists
    yet.**
+
+   **The card lives in the thread, not over it.** `AuthGate` inserts itself
+   into `[data-log]` ahead of `[data-stream]`, so it reads as the opening
+   message and anything the patient opens afterwards lands underneath it. The
+   chat is whole the entire time — header, service rail and composer all live
+   — and tapping a service before signing in opens that form and submits it,
+   because every form carries its own identity fields and its own consent.
+   Signing in buys message history and not retyping yourself; it is not a toll
+   gate on the service.
+
+   Two consequences for whoever wires the server. **History is the server's
+   job, not the CSS's**: an unauthenticated client must be sent no transcript
+   at all, exactly as the demo's `onSession` models. The `is-guest` and
+   `is-unlinked` rules are a second line for sessions that exist but have no
+   record attached. And `is-locked` is the strict one — it hides forms and the
+   notice too, because a half-filled assessment is what a locked screen is for.
+
+   Never put the card back inside `[data-stream]`. `render()` calls
+   `replaceChildren()` on that node and would delete it.
 
    **Nothing asks for a health card number or a date of birth.** There was a
    "Confirm it's you" screen that did, standing between signing up and seeing

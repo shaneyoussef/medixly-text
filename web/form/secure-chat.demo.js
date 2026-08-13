@@ -310,7 +310,11 @@ const chat = new SecureChat(document.getElementById('chat'), {
   pharmacyName: 'Medixly',
   presence: 'Pharmacist on duty · replies within 2 hours',
   country: 'Canada',
-  history: seed,
+  // No `history` here on purpose. The thread starts empty and the seeded
+  // messages arrive in onSession below, which is how the real server has to
+  // behave: an unauthenticated client is sent no transcript at all. The
+  // is-guest / is-unlinked CSS rules are a second line for sessions that do
+  // exist but have no pharmacy record attached — not the first line.
   transport,
   shop,
   onBack: () => console.log('[SecureChat] back'),
@@ -383,7 +387,13 @@ new AuthGate(document.getElementById('chat'), {
   chat,
   pharmacyName: 'Medixly',
   country: 'Canada',
-  onSession: profile => console.log('[auth] session', profile)
+  onSession: profile => {
+    console.log('[auth] session', profile);
+    // Stands in for GET /api/chat/stream. History belongs to a linked patient
+    // record, so a guest or a brand new account gets an empty thread rather
+    // than someone else's conversation.
+    chat.load(profile && profile.linked ? seed : []);
+  }
 });
 
 /* ── Going live ───────────────────────────────────────────────────────

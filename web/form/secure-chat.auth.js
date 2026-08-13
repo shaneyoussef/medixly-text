@@ -7,8 +7,13 @@
      login    →  been here before. Email and password, or any of the above.
 
    Plus the screens that hang off them — email/SMS code, password reset,
-   passkey enrollment and the idle lock. Renders over the chat shell and
-   reveals it only once there's a verified session.
+   passkey enrollment and the idle lock.
+
+   The card renders *inside* the thread, as its opening message. The chat is
+   whole the whole time: the header, the service rail and the composer stay
+   live, and a patient can open a form and send a request without ever
+   touching the card. What signing in adds is message history and not having
+   to retype themselves.
 
    Nothing here asks for a health card number or a date of birth. See the
    note on afterIdentity() for what replaced that, and why.
@@ -85,9 +90,21 @@ class AuthGate {
     this.profile = null;
     this.canPasskey = false;
 
+    // Inside the thread, not over it. The chat stays whole behind the card —
+    // header, service rail and composer all live — so signing up reads as the
+    // opening move in a conversation rather than a door to get through.
+    //
+    // Two placement details, both load-bearing. It goes *beside* [data-stream]
+    // rather than inside it, because render() calls replaceChildren() on that
+    // node and would wipe anything it found there. And it goes *before* it, so
+    // that a form the patient opens from the rail lands underneath the card as
+    // the newer thing, which is the order they did them in.
     this.layer = document.createElement('div');
     this.layer.className = 'mx-gate';
-    host.append(this.layer);
+    const log = host.querySelector('[data-log]');
+    const stream = log?.querySelector('[data-stream]');
+    if (stream) log.insertBefore(this.layer, stream);
+    else (log || host).append(this.layer);
 
     this.watchIdle();
     this.start();
@@ -105,11 +122,20 @@ class AuthGate {
     this.screen('welcome');
   }
 
+  /** Shows or hides the card, and tells the shell which state it is in. */
+  gate(open) {
+    this.layer.hidden = !open;
+    // The jump-to-latest pill would otherwise float over the card, offering to
+    // scroll past the one thing on screen.
+    this.host.classList.toggle('is-gated', open);
+  }
+
   ready(profile) {
     this.profile = profile;
     this.opts.onSession?.(profile);
     this.opts.chat?.setProfile?.(profile);
-    this.layer.hidden = true;
+    this.host.classList.remove('is-locked');
+    this.gate(false);
     // Both states hide the transcript: a guest has no record, and an
     // unlinked account has not been matched to one yet.
     this.host.classList.toggle('is-guest', !!profile.guest);
@@ -121,16 +147,29 @@ class AuthGate {
     try { await this.auth.signOut(); } catch { /* sign out locally regardless */ }
     this.profile = null;
     this.opts.onSession?.(null);
-    this.layer.hidden = false;
+    this.gate(true);
     // Someone signing out has an account, so send them to login, not welcome.
     this.screen('login');
   }
 
-  /** Locks without dropping the session — unlock is a passkey or a code. */
+  /**
+   * Locks without dropping the session — unlock is a passkey or a code.
+   * `is-locked` hides everything in the thread, forms included: a half-filled
+   * assessment is exactly the sort of thing a locked screen exists to cover.
+   * That is stricter than the guest rule, which keeps forms so a guest has
+   * something to use.
+   */
   lock() {
     if (!this.profile || this.profile.guest || !this.layer.hidden) return;
-    this.layer.hidden = false;
+    this.host.classList.add('is-locked');
+    this.gate(true);
     this.screen('locked');
+  }
+
+  unlock() {
+    this.host.classList.remove('is-locked');
+    this.gate(false);
+    this.touch();
   }
 
   watchIdle() {
@@ -162,8 +201,13 @@ class AuthGate {
     }[name];
     this.back = data?.back || null;
     this.layer.replaceChildren(build());
-    this.layer.scrollTop = 0;
     this.layer.querySelector('input, button')?.focus({ preventScroll: true });
+    // Bring the card into view from its *top*, not by scrolling the thread to
+    // the bottom. These cards are taller than the log on a phone, and landing
+    // on a headline reads as an invitation where landing mid-form reads as
+    // paperwork.
+    requestAnimationFrame(() =>
+      this.layer.scrollIntoView({ block: 'start', behavior: 'auto' }));
   }
 
   /* ── Card parts ──────────────────────────────────────────────── */
@@ -711,8 +755,7 @@ class AuthGate {
       card.append(this.button('Unlock', 'primary', async () => {
         try {
           await this.auth.passkeyAuth();
-          this.layer.hidden = true;
-          this.touch();
+          this.unlock();
         } catch {
           this.error(card, 'That didn\u2019t work. Use a code instead.');
         }

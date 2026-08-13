@@ -1,15 +1,24 @@
 /* ── Auth gate ────────────────────────────────────────────────────────
-   Covers the chat shell until there's a verified session. Uses the same
-   Medixly tokens as everything else — no new colours, no new sizes.
+   Signing in happens *inside* the conversation, as the newest card in the
+   thread, not on a screen laid over it. The chat is whole the entire time:
+   the pharmacy's name is in the header, the service rail is live, and the
+   card reads as the next step rather than a door.
+
+   That is a deliberate reversal — this used to be a full-bleed overlay with
+   its own glow. Nothing else changed with it; the card, its fields and its
+   buttons are the same components, they simply sit in the flow now. Uses the
+   same Medixly tokens as everything else — no new colours, no new sizes.
    ─────────────────────────────────────────────────────────────────── */
 
-.mx-gate{position:absolute;inset:0;z-index:7;display:flex;align-items:center;justify-content:center;
-  padding:var(--space-6);background:var(--surface-glow);overflow-y:auto}
+.mx-gate{display:block;padding:var(--space-2) 0 var(--space-4)}
 .mx-gate[hidden]{display:none}
 
+/* Slightly inset on the left, like an inbound bubble, so it belongs to the
+   pharmacy's side of the conversation rather than floating in the middle. */
 .mx-gate__card{width:100%;max-width:var(--container-narrow);padding:var(--space-5);
-  background:rgba(255,255,255,.94);border:1px solid var(--border-subtle);
-  border-radius:var(--radius-card);box-shadow:var(--shadow-md)}
+  background:var(--surface-bubble);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-card);border-top-left-radius:var(--radius-tail);
+  box-shadow:var(--shadow-sm)}
 .mx-gate__card h2{font-family:var(--font-display);font-weight:var(--weight-semibold);
   font-size:var(--text-h2);letter-spacing:var(--tracking-tight);line-height:var(--leading-tight);
   color:var(--ink-900);margin:0}
@@ -158,5 +167,13 @@
 .is-guest .mx-jump,
 .is-unlinked .mx-log .mx-msg:not(.mx-msg--form),
 .is-unlinked .mx-jump,
+/* While the card is up it is the only thing worth looking at, so the
+   jump-to-latest pill has nothing useful to offer. */
+.is-gated .mx-jump,
+/* The idle lock is the strict one: everything goes, forms included. A
+   half-filled assessment is exactly what a locked screen is for. */
+.is-locked .mx-log .mx-msg,
+.is-locked .mx-notice,
+.is-locked .mx-jump,
 .is-checkout .mx-log .mx-msg:not(.mx-msg--form),
 .is-checkout .mx-jump{display:none}
