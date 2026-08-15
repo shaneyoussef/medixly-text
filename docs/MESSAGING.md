@@ -81,6 +81,34 @@ message lands where nobody is looking.
 cancelled for the retention interval. The row survives with its timestamps:
 deleting those would defeat the audit trail they belong to.
 
+## Auditing it
+
+Three layers, because no one of them is enough on its own.
+
+**The algorithm** — `npm run test:crypto`. 49 checks against the same module
+the function imports, so it cannot pass while the deployment drifts. Covers
+round trips, ciphertext that does not contain its plaintext, a fresh iv every
+time, tampering refused rather than returned, rotation, and every flavour of
+bad configuration failing closed.
+
+**The deployment** — `STAFF_KEY=... REFERENCE=TR-XXXXX npm run audit:chat`.
+Black box over HTTPS with only the things a stolen laptop would have. Probes
+the auth boundaries, runs a real message each way, checks a token cannot be
+widened to another request, and confirms revoking is immediate. Safe against
+production: it sends two marked test messages and revokes at the end.
+
+**The parts a script cannot reach** —
+
+| Check | How |
+|---|---|
+| Bodies really are ciphertext | `select left(body,12) from messages order by created_at desc limit 5` — every row must start `mx1.` |
+| The audit log holds no message text | `select detail from audit_log where action like '%message%'` |
+| Database posture | Supabase advisors, after every schema change. They caught a mutable `search_path` on `purge_old_messages` the day it was written |
+| Who holds the staff key | A person has to answer this, and the answer changes when someone leaves |
+
+Re-run the advisors after any migration. Re-run the audit script after any
+change to the function, and after rotating either secret.
+
 ## Gaps
 
 1. **Per-person staff auth.** `x-staff-key` is one shared secret, so the audit
