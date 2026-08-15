@@ -1,4 +1,4 @@
-cbc15ce  2026-08-13 21:17  Detect the keyboard by focus, not by arithmetic
+00667f2  2026-08-15 16:48  Wire both ends of the encrypted channel
 
 What this file is for
 ---------------------
