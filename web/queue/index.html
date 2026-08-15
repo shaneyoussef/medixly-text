@@ -52,6 +52,32 @@
   .panels{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
   @media(max-width:820px){.panels{grid-template-columns:1fr}}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:16px 18px}
+
+  /* Thread. Encrypted at rest and decrypted by the chat function, so what is
+     on screen here is the only place these words are readable — which is why
+     the page never stores them and re-fetches on every open. */
+  .thread{border-top:1px solid var(--line);margin-top:14px;padding-top:14px}
+  .thread .hd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .thread .hd h4{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);font-weight:600}
+  .thread .hd .grow{flex:1}
+  .msgs{max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;
+    padding:12px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+  .msg{max-width:78%;padding:9px 12px;border-radius:12px;font-size:14px;line-height:1.45;
+    white-space:pre-wrap;overflow-wrap:anywhere}
+  .msg.them{align-self:flex-start;background:var(--card);border:1px solid var(--line)}
+  .msg.us{align-self:flex-end;background:#10262A;color:#EAF2F0}
+  .msg .m{display:block;margin-top:4px;font-size:11px;opacity:.6;
+    font-family:'JetBrains Mono',monospace}
+  .msg.unread{box-shadow:0 0 0 2px #C7A34A}
+  .compose{display:flex;gap:8px;margin-top:10px}
+  .compose textarea{flex:1;min-height:44px;max-height:140px;resize:vertical;
+    font-family:'Inter',sans-serif;font-size:14px;padding:10px 12px;
+    border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+  .link{font-family:'JetBrains Mono',monospace;font-size:11px;word-break:break-all;
+    color:var(--muted);margin-top:8px}
+  .link b{color:var(--ink)}
+  .thread .none{color:var(--muted);font-size:13.5px;padding:6px 2px}
   .panel h3{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:13px}
 
   .bar{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:13px}
@@ -317,15 +343,138 @@ function renderRows() {
           <button class="btn" onclick="setStatus('${esc(r.reference)}','cancelled')">Cancel</button>
           <button class="btn on" onclick="setStatus('${esc(r.reference)}','completed')">Mark done</button>
         </div>
+        <!-- Filled by openThread() when the row is expanded, and emptied when
+             it collapses. Message bodies are decrypted server-side and exist
+             only for as long as this node does. -->
+        <div class="thread" id="t-${esc(r.reference)}"></div>
       </div>
     </div>`;
   }).join("");
 }
 
 window.toggle = ref => {
-  openRef = openRef === ref ? null : ref;
+  const closing = openRef === ref;
+  openRef = closing ? null : ref;
   document.querySelectorAll('.body').forEach(b => b.classList.remove('open'));
-  if (openRef) $('b-'+openRef)?.classList.add('open');
+  stopPolling();
+  // Wipe every thread on the way past. Decrypted bodies should not sit in a
+  // collapsed row waiting for someone to open the console.
+  document.querySelectorAll('.thread').forEach(t => t.innerHTML = "");
+  if (!closing) { $('b-'+openRef)?.classList.add('open'); openThread(openRef); }
+};
+
+/* ---------------- thread ----------------
+   The encrypted channel. /chat decrypts on the way out, so nothing here ever
+   sees ciphertext and nothing here should ever cache what it gets: the panel
+   is rebuilt from the server on every open, and emptied on every close.
+
+   Polling rather than realtime. It is four lines instead of a subscription,
+   it survives a laptop lid closing, and at a pharmacy's message volume the
+   difference is invisible. Swap it for Supabase Realtime when a pharmacist is
+   ever waiting on a reply in earnest. */
+
+const CHAT = "https://vejzchchrliqrlzlepkc.supabase.co/functions/v1/chat";
+const POLL_MS = 15000;
+let pollTimer = null, threadRef = null;
+
+async function chatApi(qs, opts = {}) {
+  const res = await fetch(CHAT + qs, {
+    ...opts,
+    headers: { "content-type": "application/json", "x-staff-key": staffKey, ...(opts.headers || {}) }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || "Request failed"), { status: res.status });
+  return data;
+}
+
+function stopPolling(){ clearInterval(pollTimer); pollTimer = null; threadRef = null; }
+
+const when = iso => {
+  const d = new Date(iso), today = new Date().toDateString() === d.toDateString();
+  return today ? d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})
+               : d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+};
+
+async function openThread(ref) {
+  threadRef = ref;
+  const box = $('t-'+ref);
+  if (!box) return;
+  box.innerHTML = `<div class="none">Loading the conversation…</div>`;
+  try {
+    paintThread(ref, await chatApi(`?reference=${encodeURIComponent(ref)}`));
+    clearInterval(pollTimer);
+    pollTimer = setInterval(() => refreshThread(ref), POLL_MS);
+  } catch (e) {
+    box.innerHTML = `<div class="none">Couldn't load the conversation — ${esc(e.message)}</div>`;
+  }
+}
+
+async function refreshThread(ref) {
+  // The row may have been collapsed between ticks.
+  if (threadRef !== ref || !$('t-'+ref)) return stopPolling();
+  try { paintThread(ref, await chatApi(`?reference=${encodeURIComponent(ref)}`)); } catch { /* keep what's on screen */ }
+}
+
+function paintThread(ref, t) {
+  const box = $('t-'+ref);
+  if (!box || threadRef !== ref) return;
+
+  // Preserve a half-typed reply across a poll. Losing a pharmacist's sentence
+  // to a background refresh is the fastest way to make them stop using this.
+  const draft = box.querySelector('.compose textarea')?.value ?? "";
+  const atBottom = (() => { const m = box.querySelector('.msgs');
+    return !m || m.scrollHeight - m.scrollTop - m.clientHeight < 40; })();
+
+  const msgs = (t.messages || []).map(m => `
+    <div class="msg ${m.sender === 'patient' ? 'them' : 'us'}">${esc(m.body)}<span class="m">${
+      esc(m.sender === 'patient' ? (t.patient_name || 'Patient') : (m.author || 'Pharmacy'))
+    } · ${esc(when(m.created_at))}</span></div>`).join("");
+
+  box.innerHTML = `
+    <div class="hd">
+      <h4>Secure conversation</h4>
+      <div class="grow"></div>
+      ${t.link
+        ? `<button class="btn" onclick="renewChat('${esc(ref)}')">Renew link</button>
+           <button class="btn" onclick="revokeChat('${esc(ref)}')">Revoke</button>`
+        : `<button class="btn on" onclick="renewChat('${esc(ref)}')">Open a secure chat</button>`}
+    </div>
+    <div class="msgs">${msgs || `<div class="none">No messages yet.</div>`}</div>
+    ${t.link ? `
+      <div class="compose">
+        <textarea id="c-${esc(ref)}" placeholder="Reply to ${esc(t.patient_name || 'the patient')}"></textarea>
+        <button class="btn on" onclick="sendChat('${esc(ref)}')">Send</button>
+      </div>
+      <div class="link"><b>Patient link</b> · expires ${esc(when(t.expires_at))}<br>${esc(t.link)}</div>`
+      : `<div class="none">This patient has no way in yet. Opening a secure chat creates a private link to send them.</div>`}`;
+
+  const box2 = box.querySelector('.compose textarea');
+  if (box2) box2.value = draft;
+  const m = box.querySelector('.msgs');
+  if (m && atBottom) m.scrollTop = m.scrollHeight;
+}
+
+window.renewChat = async ref => {
+  try { await chatApi(`?reference=${encodeURIComponent(ref)}`, { method:"POST", body: JSON.stringify({ open:true }) });
+        await openThread(ref); }
+  catch(e){ showErr(e.message); }
+};
+window.revokeChat = async ref => {
+  if (!confirm("Revoke this patient's link? They lose access to the conversation immediately.")) return;
+  try { await chatApi(`?reference=${encodeURIComponent(ref)}`, { method:"POST", body: JSON.stringify({ revoke:true }) });
+        await openThread(ref); }
+  catch(e){ showErr(e.message); }
+};
+window.sendChat = async ref => {
+  const el = $('c-'+ref), body = el?.value.trim();
+  if (!body) return;
+  el.disabled = true;
+  try {
+    await chatApi(`?reference=${encodeURIComponent(ref)}`, { method:"POST", body: JSON.stringify({ body }) });
+    el.value = "";
+    await openThread(ref);
+  } catch(e){ showErr(e.message); }
+  finally { el.disabled = false; el.focus(); }
 };
 window.setStatus = async (reference, status) => {
   const notes = $('n-'+reference)?.value ?? undefined;

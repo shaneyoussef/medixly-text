@@ -29,6 +29,7 @@ don't merge into it.
 | `secure-chat.shop.js` | `MedixlyShop`: product search, basket, Shopify checkout. | yes |
 | `secure-chat.agent.js` | `MedixlyAgent`: posts each message to `POST /api/chat` and applies the decision. | yes |
 | `secure-chat.print.js` | `MedixlyPrint`: print/fax submission sheets. | **placeholder** |
+| `secure-chat.live.js` | `MedixlyLive`: the real transport. Takes over when the URL carries `?t=<token>`, talks to `/functions/v1/chat`, and skips the sign-in gate — the token is the credential. See [`../docs/MESSAGING.md`](../docs/MESSAGING.md). | yes |
 | `secure-chat.demo.js` | Stub transport, the submission mapper, boot. Replace the transport to go live; keep the mapper. | yes |
 | `version.txt` | One line naming the deployed commit. Open `/version.txt` to tell a stale deploy apart from a stale browser cache. Update it when you push. | yes |
 | `img/pharmacist.png` | The illustration on the sign-up and log-in screens. Recoloured to the palette before it was committed — see below. | yes |

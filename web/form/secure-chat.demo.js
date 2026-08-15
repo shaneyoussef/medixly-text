@@ -390,19 +390,52 @@ const demoAuth = {
   signOut: () => wait(300, { ok: true })
 };
 
-new AuthGate(document.getElementById('chat'), {
-  auth: demoAuth,
-  chat,
-  pharmacyName: 'Medixly',
-  country: 'Canada',
-  onSession: profile => {
-    console.log('[auth] session', profile);
-    // Stands in for GET /api/chat/stream. History belongs to a linked patient
-    // record, so a guest or a brand new account gets an empty thread rather
-    // than someone else's conversation.
-    chat.load(profile && profile.linked ? seed : []);
-  }
-});
+/* ── Which world are we in? ────────────────────────────────────────────
+   A `?t=` token in the URL means a pharmacist opened a secure chat and sent
+   the link. That is a real thread on a real server, so the stub steps aside:
+   the live transport replaces it, and the sign-in gate never runs — the token
+   is the credential, and putting an account in front of someone who followed
+   their pharmacy's link would be a second door on the same room.
+
+   Without a token this stays the demo it has always been.
+   ─────────────────────────────────────────────────────────────────── */
+
+if (LIVE_TOKEN) {
+  console.info('[SecureChat] live thread — talking to /functions/v1/chat');
+
+  const live = new MedixlyLive({
+    token: LIVE_TOKEN,
+    onError: message => chat.fail(message),
+  });
+
+  // Swap the stub out from under the shell. `send` and `subscribe` are the
+  // whole transport contract, so this is the entire handover.
+  chat.opts.transport = live;
+  live.subscribe(m => chat.receive(m));
+
+  live.start(chat).then(thread => {
+    if (thread.patient_name) chat.setProfile?.({ name: thread.patient_name, linked: true });
+    if (thread.closed) chat.setPresence?.('This request is closed \u2014 sending a message reopens it');
+  }).catch(err => {
+    console.error('[SecureChat] could not open the thread', err);
+    chat.fail(err.message || 'We couldn\u2019t open this conversation.');
+  });
+
+} else {
+  new AuthGate(document.getElementById('chat'), {
+    auth: demoAuth,
+    chat,
+    pharmacyName: 'Medixly',
+    country: 'Canada',
+    onSession: profile => {
+      console.log('[auth] session', profile);
+      // Stands in for GET /api/chat/stream. History belongs to a linked patient
+      // record, so a guest or a brand new account gets an empty thread rather
+      // than someone else's conversation.
+      chat.load(profile && profile.linked ? seed : []);
+    }
+  });
+}
 
 /* ── Going live ───────────────────────────────────────────────────────
    Keep `toSubmission()` — it is the real mapping, not demo scaffolding —

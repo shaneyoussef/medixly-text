@@ -20,7 +20,7 @@
   Every value comes from a design-system token. Wiring instructions are at
   the bottom of secure-chat.demo.js.
 
-  Script order matters: core → forms → auth → shop → agent → print → demo.
+  Script order matters: core → forms → auth → shop → agent → print → live → demo.
   Nothing is referenced at evaluation time across files, but `demo`
   constructs everything, so it goes last.
 
@@ -28,7 +28,16 @@
   suggests a product for a symptom — see docs/AGENT.md and docs/SHOP.md.
 
   The sign-in gate is not in this markup — `AuthGate` builds it and appends
-  it to `.mx-chat` itself.
+  it to `.mx-chat` itself. It is skipped entirely when the URL carries a
+  `?t=` chat token: that token is the credential, and asking someone who
+  followed a link from their pharmacy to also make an account would be a
+  second door on the same room.
+
+  The notice below says "encrypted", not "encrypted end to end", and the
+  difference is deliberate. Bodies are AES-256-GCM at rest under a key the
+  database does not hold, and TLS in transit — but the pharmacy can read
+  them, because PHIPA requires the custodian to be able to. Claiming
+  end-to-end would be a promise this system does not keep.
 -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -62,7 +71,7 @@
     <div class="mx-log" data-log role="log" aria-live="off" aria-label="Conversation with Medixly">
       <div class="mx-notice">
         <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/lock.svg)"></i>
-        <p>This conversation is encrypted end to end. Don't send emergency requests here — call us or dial 911.</p>
+        <p>This conversation is encrypted and stored in Canada. Don't send emergency requests here — call us or dial 911.</p>
       </div>
       <div data-stream></div>
     </div>
@@ -164,6 +173,7 @@
 <script src="secure-chat.shop.js"></script>
 <script src="secure-chat.agent.js"></script>
 <script src="secure-chat.print.js"></script>
+<script src="secure-chat.live.js"></script>
 <script src="secure-chat.demo.js"></script>
 </body>
 </html>
