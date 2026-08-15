@@ -1,4 +1,4 @@
-00667f2  2026-08-15 16:48  Wire both ends of the encrypted channel
+6a7dcc9  2026-08-15 17:15  Add an audit for the channel, and fix what it found
 
 What this file is for
 ---------------------
