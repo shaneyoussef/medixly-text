@@ -74,6 +74,8 @@ Treat it as one row, not as multi-tenancy.
 - [`docs/CLASSIFIER.md`](docs/CLASSIFIER.md) — system prompt and output contract
 - [`docs/AGENT.md`](docs/AGENT.md) — what the system does with a classification
 - [`docs/SHOP.md`](docs/SHOP.md) — in-chat Shopify ordering, and its allowlist
+- [`docs/TEST-PLAN.md`](docs/TEST-PLAN.md) — how every feature is tested and audited before it reaches a patient
+- [`docs/MESSAGING.md`](docs/MESSAGING.md) — the encrypted patient/pharmacist channel
 - [`docs/PIA.md`](docs/PIA.md) — privacy impact assessment (draft, pre-pilot)
 - [`docs/privacy-documents.md`](docs/privacy-documents.md) — the four documents PHIPA requires of a custodian
 - [`docs/VOICE.md`](docs/VOICE.md) — voice transfer flow
