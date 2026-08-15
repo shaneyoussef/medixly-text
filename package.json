@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "test:agent": "tsx test/agent.ts",
+    "test:classifier": "tsx test/run.ts",
+    "test:crypto": "tsx test/crypto.ts",
     "test:notify": "tsx test/notify.ts",
-    "test:shop": "tsx test/shop.ts",
-    "test:classifier": "tsx test/run.ts"
+    "test:shop": "tsx test/shop.ts"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
