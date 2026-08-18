@@ -57,6 +57,12 @@ async function call(qs, { method = "GET", key, body } = {}) {
 
 const staff = (qs, opts = {}) => call(qs, { key: KEY, ...opts });
 
+function tokenFromLink(link) {
+  const u = new URL(link);
+  return u.searchParams.get("t")
+    || new URLSearchParams(u.hash.replace(/^#/, "")).get("t");
+}
+
 console.log(`\nAuditing ${BASE}\n`);
 
 /* ── 1. It refuses everything it should ───────────────────────────── */
@@ -77,6 +83,14 @@ ok("a staff key of the right length but wrong value is refused",
 ok("a made-up patient token is refused", (await call("?t=notarealtokenatall")).status === 404);
 ok("staff route with no reference is refused", (await staff("")).status === 400);
 ok("an unknown reference is refused", (await staff("?reference=TR-DOESNOTEXIST")).status === 404);
+{
+  const r = await fetch(BASE + `?reference=${REF}`, {
+    headers: { origin: "https://evil.example", "content-type": "application/json" },
+  });
+  const acao = r.headers.get("access-control-allow-origin");
+  ok("a foreign origin is not allowed via CORS", acao !== "*" && acao !== "https://evil.example",
+    `got ${acao}`);
+}
 
 /* ── 2. Opening a chat ────────────────────────────────────────────── */
 console.log("\nOpening a conversation");
@@ -85,13 +99,24 @@ ok("staff can open a secure chat", opened.status === 201 && !!opened.json.link,
   `got ${opened.status} ${opened.json.error ?? ""}`);
 if (!opened.json.link) { report(); process.exit(1); }
 
-const token = new URL(opened.json.link).searchParams.get("t");
+let token = tokenFromLink(opened.json.link);
 ok("the link carries a token", !!token);
+ok("the token is in the hash, not the query string",
+  (opened.json.link ?? "").includes("#t=") && !(opened.json.link ?? "").includes("?t="),
+  opened.json.link);
 ok("the token is long enough to not be guessable", (token ?? "").length >= 20, `${token?.length} chars`);
 ok("the link expires", !!opened.json.expires_at);
 {
   const days = (new Date(opened.json.expires_at) - Date.now()) / 864e5;
   ok("...within a sane window", days > 0 && days <= 31, `${days.toFixed(1)} days`);
+}
+{
+  const renewed = await staff(`?reference=${REF}`, { method: "POST", body: { open: true } });
+  const token2 = tokenFromLink(renewed.json.link ?? "");
+  ok("renewing mints a new token", !!token2 && token2 !== token, "renew reused the leaked token");
+  ok("the old token dies on renew", (await call(`?t=${token}`)).status === 404);
+  // The rest of the audit uses the live token.
+  if (token2) token = token2;
 }
 
 /* ── 3. The round trip ────────────────────────────────────────────── */

@@ -31,7 +31,8 @@ read would trade all of that away for a property a custodian is not permitted
 to have — and one lost phone would be one destroyed medical record.
 
 The patient notice used to claim end-to-end. It now says "encrypted and
-stored in Canada", which is true.
+stored in Canada", which is true of the database. The decrypting function
+runs on Supabase's edge network, which is not pinned to Montréal.
 
 ## The envelope
 
@@ -56,7 +57,15 @@ why; it will not fall back to storing plaintext.
 STAFF_KEY     openssl rand -base64 24
 MESSAGE_KEYS  k1:$(openssl rand -base64 32)
 CHAT_URL      https://medixly.netlify.app/     (where the patient link points)
+CHAT_ORIGINS  https://YOUR-QUEUE.netlify.app  (staff dashboard origin)
 ```
+
+`CHAT_CORS_STRICT=1` turns off the `*.netlify.app` wildcard and allows only the
+explicit list. Set it once both site URLs are known.
+
+The patient link is `https://medixly.netlify.app/#t=<token>`. The token sits
+in the hash so it is not sent to Netlify or to anyone as a Referer. `?t=`
+still works on the client and is rewritten to the hash on load.
 
 ## Flow
 
@@ -65,12 +74,12 @@ CHAT_URL      https://medixly.netlify.app/     (where the patient link points)
    scoped to that one request and good for 14 days, and returns a link.
 3. The patient opens the link. No account, no password — the token is the
    credential, which is why it expires and why the client never stores it
-   anywhere but the address bar.
+   anywhere but the address bar (in the hash, not the query string).
 4. Both sides poll. Fifteen seconds on the dashboard, eight in the patient
    client. Realtime is the obvious upgrade; polling survives a closed laptop
    lid and is invisible at a pharmacy's volume.
-5. **Revoke** kills access immediately, for when a link reaches the wrong
-   person.
+5. **Renew** mints a new token and kills the old one. **Revoke** kills access
+   immediately, for when a link reaches the wrong person.
 
 A patient replying to a closed request reopens it, because otherwise their
 message lands where nobody is looking.
@@ -85,11 +94,8 @@ deleting those would defeat the audit trail they belong to.
 
 Three layers, because no one of them is enough on its own.
 
-**The algorithm** — `npm run test:crypto`. 49 checks against the same module
-the function imports, so it cannot pass while the deployment drifts. Covers
-round trips, ciphertext that does not contain its plaintext, a fresh iv every
-time, tampering refused rather than returned, rotation, and every flavour of
-bad configuration failing closed.
+**The algorithm** — `npm run test:crypto` (49 checks) and `npm run test:chat-guard`.
+Both run against the same modules the function imports.
 
 **The deployment** — `STAFF_KEY=... REFERENCE=TR-XXXXX npm run audit:chat`.
 Black box over HTTPS with only the things a stolen laptop would have. Probes
@@ -114,9 +120,11 @@ change to the function, and after rotating either secret.
 1. **Per-person staff auth.** `x-staff-key` is one shared secret, so the audit
    log records "staff" where PHIPA s.10(1) asks *which* staff. Blocks the
    pilot. Risk 1 in `docs/PIA.md`.
-2. **No rate limit** on either side. The patient route is unauthenticated by
-   design, so a leaked token can be hammered; the staff route can be
-   brute-forced.
+2. **Rate limits are per isolate.** They slow a single script down. They do
+   not stop a distributed guess. The patient route is still unauthenticated
+   by design — the token is the credential.
 3. **The staff key lives in a browser tab**, typed into the queue page.
-   Anyone with the device has it.
+   Anyone with the unlocked device has it.
 4. **Rotation is supported but unscheduled.**
+5. **Edge compute is not pinned to Canada.** Ciphertext is in the project
+   database; this function decrypts near the caller.

@@ -6,6 +6,7 @@
   "scripts": {
     "audit:chat": "node test/audit-chat.mjs",
     "test:agent": "tsx test/agent.ts",
+    "test:chat-guard": "tsx test/chat-guard.ts",
     "test:classifier": "tsx test/run.ts",
     "test:crypto": "tsx test/crypto.ts",
     "test:notify": "tsx test/notify.ts",

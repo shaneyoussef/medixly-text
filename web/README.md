@@ -49,8 +49,7 @@ Pushing to `main` redeploys both.
 ## Before real patients
 
 - Replace the shared staff key with per-person authentication.
-- Add rate limiting to the `submit`, `chat` and `shop` endpoints. `chat` spends
-  money on every call.
+- Rate limits on `chat` are in-memory per isolate; add an edge-wide store before a leaked token is a realistic threat. `submit` and `shop` are still unthrottled.
 - Pharmacist sign-off on the `chat-eligible` collection: some of what a pharmacy
   stocks cannot lawfully be sold from an unattended cart.
 - Link the privacy notice from the form footer.

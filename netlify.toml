@@ -30,7 +30,16 @@
 #
 # When the client stops changing daily, the better answer is fingerprinted
 # filenames plus a long max-age — not a longer max-age on these paths.
+#
+# Security headers: the patient token used to sit in `?t=` on a page that
+# loaded Google Fonts and unpkg, so the credential left the origin as a
+# Referer. Fonts and icons are local now; these headers close the rest.
 [[headers]]
   for = "/*"
   [headers.values]
     Cache-Control = "no-cache"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=(), usb=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://cdn.shopify.com; font-src 'self'; connect-src 'self' https://vejzchchrliqrlzlepkc.supabase.co; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"

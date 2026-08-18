@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Secure chat — Medixly</title>
+<meta name="referrer" content="no-referrer">
 
 <!--
   Medixly · Patient secure chat — shell
@@ -40,10 +41,7 @@
   end-to-end would be a promise this system does not keep.
 -->
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700&display=swap">
-
+<link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="ds-tokens.css">
 <link rel="stylesheet" href="secure-chat.css">
 <link rel="stylesheet" href="secure-chat.auth.css">
@@ -53,7 +51,7 @@
 
   <header class="mx-header">
     <button type="button" class="mx-iconbtn" data-back aria-label="Back">
-      <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/chevron-left.svg)"></i>
+      <i class="mx-icon" style="--icon:url(icons/chevron-left.svg)"></i>
     </button>
     <div class="mx-identity">
       <div class="mx-name" data-name>Medixly</div>
@@ -63,20 +61,20 @@
       </div>
     </div>
     <button type="button" class="mx-iconbtn mx-iconbtn--outline" data-call aria-label="Call the pharmacy">
-      <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/phone.svg)"></i>
+      <i class="mx-icon mx-icon--sm" style="--icon:url(icons/phone.svg)"></i>
     </button>
   </header>
 
   <div class="mx-body">
     <div class="mx-log" data-log role="log" aria-live="off" aria-label="Conversation with Medixly">
       <div class="mx-notice">
-        <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/lock.svg)"></i>
+        <i class="mx-icon mx-icon--sm" style="--icon:url(icons/lock.svg)"></i>
         <p>This conversation is encrypted and stored in Canada. Don't send emergency requests here — call us or dial 911.</p>
       </div>
       <div data-stream></div>
     </div>
     <button type="button" class="mx-jump" data-jump hidden>
-      <i class="mx-icon mx-icon--sm" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/arrow-down.svg)"></i>
+      <i class="mx-icon mx-icon--sm" style="--icon:url(icons/arrow-down.svg)"></i>
       Latest messages
     </button>
   </div>
@@ -91,7 +89,7 @@
     <div class="mx-row" data-row>
       <button type="button" class="mx-attach" data-attach aria-label="Attach a photo or a file"
               aria-haspopup="dialog" aria-expanded="false">
-        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/upload.svg)"></i>
+        <i class="mx-icon" style="--icon:url(icons/upload.svg)"></i>
       </button>
 
       <!-- Three pickers, so the sheet can offer the camera separately from the library. -->
@@ -102,10 +100,10 @@
       <textarea class="mx-input" data-input rows="1" placeholder="Write a message" aria-label="Write a message"></textarea>
 
       <button type="button" class="mx-send mx-mic" data-mic aria-label="Record a voice note" hidden>
-        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/mic.svg)"></i>
+        <i class="mx-icon" style="--icon:url(icons/mic.svg)"></i>
       </button>
       <button type="button" class="mx-send" data-send aria-label="Send" disabled>
-        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/arrow-right.svg)"></i>
+        <i class="mx-icon" style="--icon:url(icons/arrow-right.svg)"></i>
       </button>
     </div>
 
@@ -115,10 +113,10 @@
       <span class="mx-timer" data-timer>0:00</span>
       <div class="mx-bars" data-levels aria-hidden="true"></div>
       <button type="button" class="mx-iconbtn" data-rec-cancel aria-label="Discard recording">
-        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/trash-2.svg)"></i>
+        <i class="mx-icon" style="--icon:url(icons/trash-2.svg)"></i>
       </button>
       <button type="button" class="mx-send" data-rec-stop aria-label="Stop recording">
-        <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/check.svg)"></i>
+        <i class="mx-icon" style="--icon:url(icons/check.svg)"></i>
       </button>
     </div>
 
@@ -135,19 +133,19 @@
 
       <button type="button" class="mx-option" data-pick="camera">
         <span class="mx-disc mx-disc--ink">
-          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/camera.svg)"></i>
+          <i class="mx-icon" style="--icon:url(icons/camera.svg)"></i>
         </span>
         Take a photo
       </button>
       <button type="button" class="mx-option" data-pick="photos">
         <span class="mx-disc mx-disc--teal">
-          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/image.svg)"></i>
+          <i class="mx-icon" style="--icon:url(icons/image.svg)"></i>
         </span>
         Photo library
       </button>
       <button type="button" class="mx-option" data-pick="docs">
         <span class="mx-disc mx-disc--clay">
-          <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/file-text.svg)"></i>
+          <i class="mx-icon" style="--icon:url(icons/file-text.svg)"></i>
         </span>
         Choose a file
       </button>
@@ -160,7 +158,7 @@
   <div class="mx-viewer" data-viewer hidden>
     <img data-viewer-img alt="Attachment">
     <button type="button" class="mx-iconbtn" data-viewer-close aria-label="Close">
-      <i class="mx-icon" style="--icon:url(https://unpkg.com/lucide-static@0.454.0/icons/x.svg)"></i>
+      <i class="mx-icon" style="--icon:url(icons/x.svg)"></i>
     </button>
   </div>
 

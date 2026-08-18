@@ -134,15 +134,15 @@ system and bad intentions.
 | 3.4 | SQL in the token | Refused | BLOCKER | |
 | 3.5 | Null bytes, RTL overrides and 4-byte emoji in a message body | Stored and returned intact, no crash | MEDIUM | |
 | 3.6 | `PUT`, `DELETE`, `PATCH` on both routes | 405 | MEDIUM | |
-| 3.7 | Send 200 messages in 10 seconds on one token | **Currently all succeed — no rate limit.** Known gap | HIGH | |
-| 3.8 | Brute-force the staff key from a script | **Currently unlimited attempts.** Known gap | HIGH | |
-| 3.9 | Call the function from a random website's console with a stolen token | **Currently allowed — CORS is `*`.** Should be locked to known origins | MEDIUM | |
+| 3.7 | Send 200 messages in 10 seconds on one token | After ~40 in a minute, 429. Limit is per isolate. | HIGH | |
+| 3.8 | Brute-force the staff key from a script | After 8 failures from one IP in 10 minutes, 429. Limit is per isolate. | HIGH | |
+| 3.9 | Call the function from a random website's console with a stolen token | CORS does not echo that origin and does not send `*` | MEDIUM | |
 | 3.10 | Open a link, then have staff revoke it, then press Back | No cached thread returns | HIGH | |
 | 3.11 | Expire a token by hand (`update requests set chat_expires_at = now() - interval '1 day'`) and use it | 410, clear message | HIGH | |
 | 3.12 | Point a patient token at the staff route and vice versa | Neither crosses over | BLOCKER | |
 
-> 3.7, 3.8 and 3.9 are **known to fail today.** They are written down as tests
-> rather than as excuses so that they show up red every time until fixed.
+> 3.7 and 3.8 are limited per Deno isolate, not globally. Treat a pass as
+> "this isolate slowed down", not "guessing is impossible".
 
 ## L4 — What is actually on disk
 
@@ -220,11 +220,10 @@ Carried openly rather than quietly. Each one is a test above that is red.
 | Gap | Test | Severity | Owner | Target |
 |---|---|---|---|---|
 | Shared staff key — the audit log cannot say *who* | 7.3 | BLOCKER | | Before pilot |
-| No rate limit on the patient route | 3.7 | HIGH | | Before pilot |
-| No rate limit on the staff route | 3.8 | HIGH | | Before pilot |
-| CORS allows any origin | 3.9 | MEDIUM | | Before pilot |
+| Rate limits are per isolate, not global | 3.7, 3.8 | HIGH | | Before pilot |
 | Staff key lives in a browser tab | L0 | MEDIUM | | Before pilot |
 | Key rotation is possible but unscheduled | 6.1 | LOW | | First rotation within 12 months |
+| Edge function decrypts near the caller, not pinned to Canada | 0.4 | HIGH | | Before pilot |
 
 ---
 

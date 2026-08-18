@@ -391,17 +391,18 @@ const demoAuth = {
 };
 
 /* ── Which world are we in? ────────────────────────────────────────────
-   A `?t=` token in the URL means a pharmacist opened a secure chat and sent
-   the link. That is a real thread on a real server, so the stub steps aside:
-   the live transport replaces it, and the sign-in gate never runs — the token
-   is the credential, and putting an account in front of someone who followed
-   their pharmacy's link would be a second door on the same room.
+   A `#t=` token in the URL (or a legacy `?t=`) means a pharmacist opened a
+   secure chat and sent the link. That is a real thread on a real server, so
+   the stub steps aside: the live transport replaces it, the shell goes
+   text-only, and the sign-in gate never runs — the token is the credential.
 
    Without a token this stays the demo it has always been.
    ─────────────────────────────────────────────────────────────────── */
 
 if (LIVE_TOKEN) {
   console.info('[SecureChat] live thread — talking to /functions/v1/chat');
+
+  chat.threadOnly();
 
   const live = new MedixlyLive({
     token: LIVE_TOKEN,
