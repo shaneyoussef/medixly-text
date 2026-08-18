@@ -2,9 +2,9 @@
  * /functions/v1/chat — two-way messaging between a patient and a pharmacist.
  *
  * SMS is the front door and carries no health information. This channel does:
- * it is where a patient answers "what are your symptoms". It lives in
- * ca-central-1, every message body is encrypted with a key this database does
- * not hold, and every read and write is audited.
+ * it is where a patient answers "what are your symptoms". Ciphertext lives
+ * in the project database; this function decrypts on the way out. It is not
+ * pinned to ca-central-1 — Supabase Edge Functions run near the caller.
  *
  * ── What "encrypted" means here, precisely ──────────────────────────────
  *
@@ -22,8 +22,9 @@
  * would be one destroyed medical record.
  *
  * Two callers, two auth models:
- *   Patient    — ?t=<chat_token>. No login; the token is the credential, so it
- *                expires and is scoped to exactly one request.
+ *   Patient    — t=<chat_token> (query or, on the page, #t=). No login; the
+ *                token is the credential, so it expires and is scoped to
+ *                exactly one request.
  *   Pharmacist — x-staff-key header. Pilot-grade; replace with per-person auth
  *                before the pilot, because a shared key cannot answer PHIPA
  *                s.10(1)'s question of *who* read a record.
@@ -39,6 +40,9 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { parseKeys, seal, openAll } from "./crypto.ts";
+import {
+  parseOrigins, corsHeaders, patientLink, clientIp, RateLimiter,
+} from "./guard.ts";
 
 const db = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -60,24 +64,40 @@ const db = createClient(
    that opened it. Generate one with:
 
      openssl rand -base64 32
+
+   CHAT_ORIGINS  comma-separated extra browser origins (the queue site).
+   CHAT_CORS_STRICT=1  drop the *.netlify.app wildcard; only the explicit list.
    ─────────────────────────────────────────────────────────────────── */
 const STAFF_KEY = Deno.env.get("STAFF_KEY") ?? "";
 const RAW_KEYS = Deno.env.get("MESSAGE_KEYS") ?? "";
-const CHAT_URL = Deno.env.get("CHAT_URL") ?? "https://medixly.ca/chat/";
+const CHAT_URL = Deno.env.get("CHAT_URL") ?? "https://medixly.netlify.app/";
 const TOKEN_DAYS = 14;
 const MAX_BODY = 4000;
+const ORIGINS = parseOrigins(
+  Deno.env.get("CHAT_ORIGINS"),
+  Deno.env.get("CHAT_CORS_STRICT") === "1",
+);
 
-const CORS = {
-  "access-control-allow-origin": "*",
-  "access-control-allow-headers":
-    "authorization, x-client-info, apikey, content-type, x-staff-key",
-  "access-control-allow-methods": "GET, POST, OPTIONS",
-};
+const patientHits = new RateLimiter(60_000, 40);       // leaked-token hammering
+const staffHits = new RateLimiter(60_000, 60);         // dashboard polls
+const staffFails = new RateLimiter(10 * 60_000, 8);    // staff-key guessing
+const probes = new RateLimiter(10 * 60_000, 20);       // token guessing
 
-function json(body: unknown, status = 200) {
+function cors(req: Request) {
+  return corsHeaders(req.headers.get("origin"), ORIGINS);
+}
+
+function json(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS, "content-type": "application/json" },
+    headers: { ...cors(req), "content-type": "application/json" },
+  });
+}
+
+function tooMany(req: Request) {
+  return new Response(JSON.stringify({ error: "Too many requests. Please wait a moment." }), {
+    status: 429,
+    headers: { ...cors(req), "content-type": "application/json", "retry-after": "60" },
   });
 }
 
@@ -122,13 +142,14 @@ function cleanBody(raw: unknown): string | null {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors(req) });
 
   // Fail closed rather than quietly writing plaintext into a column whose
   // whole purpose is that it holds none.
-  if (!KEYS.current) return json({ error: "Messaging is not configured." }, 503);
-  if (!STAFF_KEY) return json({ error: "Messaging is not configured." }, 503);
+  if (!KEYS.current) return json(req, { error: "Messaging is not configured." }, 503);
+  if (!STAFF_KEY) return json(req, { error: "Messaging is not configured." }, 503);
 
+  const ip = clientIp(req.headers);
   const url = new URL(req.url);
   const token = url.searchParams.get("t");
   const reference = url.searchParams.get("reference");
@@ -145,9 +166,13 @@ Deno.serve(async (req: Request) => {
     // One message for "no such token" and "expired token" would be kinder to
     // an attacker than to a patient; the split is deliberate, and neither says
     // anything about who the request belongs to.
-    if (!request) return json({ error: "This link is not valid." }, 404);
+    if (!request) {
+      if (!probes.hit(`probe:${ip}`)) return tooMany(req);
+      return json(req, { error: "This link is not valid." }, 404);
+    }
+    if (!patientHits.hit(`t:${token}`)) return tooMany(req);
     if (!request.chat_expires_at || new Date(request.chat_expires_at) < new Date()) {
-      return json({ error: "This conversation has expired. Please contact the pharmacy for a new link." }, 410);
+      return json(req, { error: "This conversation has expired. Please contact the pharmacy for a new link." }, 410);
     }
 
     if (req.method === "GET") {
@@ -157,7 +182,11 @@ Deno.serve(async (req: Request) => {
         .eq("request_id", request.id)
         .order("created_at", { ascending: true });
 
-      return json({
+      await audit(request.pharmacy_id, request.id, "patient", "viewed", {
+        view: "chat", messages: messages?.length ?? 0,
+      });
+
+      return json(req, {
         reference: request.reference,
         patient_name: request.patient_name,
         closed: ["completed", "cancelled"].includes(request.status),
@@ -167,10 +196,10 @@ Deno.serve(async (req: Request) => {
 
     if (req.method === "POST") {
       let payload: Record<string, unknown>;
-      try { payload = await req.json(); } catch { return json({ error: "Malformed request" }, 400); }
+      try { payload = await req.json(); } catch { return json(req, { error: "Malformed request" }, 400); }
 
       const body = cleanBody(payload.body);
-      if (!body) return json({ error: "Please write a message." }, 400);
+      if (!body) return json(req, { error: "Please write a message." }, 400);
 
       const { data: row, error } = await db.from("messages").insert({
         request_id: request.id,
@@ -178,7 +207,7 @@ Deno.serve(async (req: Request) => {
         sender: "patient",
         body: await seal(KEYS, body),
       }).select("id, created_at").single();
-      if (error) { console.error(error); return json({ error: "Could not send that message." }, 500); }
+      if (error) { console.error(error); return json(req, { error: "Could not send that message." }, 500); }
 
       // A patient replying to a closed thread reopens it — otherwise their
       // message lands somewhere nobody is looking.
@@ -187,15 +216,19 @@ Deno.serve(async (req: Request) => {
       }
 
       await audit(request.pharmacy_id, request.id, "patient", "message_sent");
-      return json({ ok: true, id: row.id, created_at: row.created_at }, 201);
+      return json(req, { ok: true, id: row.id, created_at: row.created_at }, 201);
     }
 
-    return json({ error: "Method not allowed" }, 405);
+    return json(req, { error: "Method not allowed" }, 405);
   }
 
   /* ── Staff side — key required ──────────────────────────────────── */
-  if (!isStaff) return json({ error: "Not authorized" }, 401);
-  if (!reference) return json({ error: "reference required" }, 400);
+  if (!isStaff) {
+    if (!staffFails.hit(`fail:${ip}`)) return tooMany(req);
+    return json(req, { error: "Not authorized" }, 401);
+  }
+  if (!staffHits.hit(`ok:${ip}`)) return tooMany(req);
+  if (!reference) return json(req, { error: "reference required" }, 400);
 
   const { data: request } = await db
     .from("requests")
@@ -203,12 +236,12 @@ Deno.serve(async (req: Request) => {
     .eq("reference", reference)
     .maybeSingle();
 
-  if (!request) return json({ error: "No such request" }, 404);
+  if (!request) return json(req, { error: "No such request" }, 404);
 
   const linkIfLive = () =>
     request.chat_token && request.chat_expires_at &&
     new Date(request.chat_expires_at) > new Date()
-      ? { link: `${CHAT_URL}?t=${request.chat_token}`, expires_at: request.chat_expires_at }
+      ? { link: patientLink(CHAT_URL, request.chat_token), expires_at: request.chat_expires_at }
       : { link: null, expires_at: null };
 
   if (req.method === "GET") {
@@ -230,7 +263,7 @@ Deno.serve(async (req: Request) => {
       view: "chat", messages: messages?.length ?? 0,
     });
 
-    return json({
+    return json(req, {
       reference: request.reference,
       patient_name: request.patient_name,
       patient_phone: request.patient_phone,
@@ -241,19 +274,20 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "POST") {
     let payload: Record<string, unknown>;
-    try { payload = await req.json(); } catch { return json({ error: "Malformed request" }, 400); }
+    try { payload = await req.json(); } catch { return json(req, { error: "Malformed request" }, 400); }
 
-    // Open or renew the patient's way in.
+    // Open or renew the patient's way in. Always mint a fresh token so a
+    // leaked link does not survive a renew — only revoke used to kill it.
     if (payload.open === true) {
-      const chat_token = request.chat_token ?? newToken();
+      const chat_token = newToken();
       const expires = new Date(Date.now() + TOKEN_DAYS * 864e5).toISOString();
 
       const { error } = await db.from("requests")
         .update({ chat_token, chat_expires_at: expires }).eq("id", request.id);
-      if (error) { console.error(error); return json({ error: "Could not open the chat." }, 500); }
+      if (error) { console.error(error); return json(req, { error: "Could not open the chat." }, 500); }
 
       await audit(request.pharmacy_id, request.id, "staff", "chat_opened", { expires });
-      return json({ link: `${CHAT_URL}?t=${chat_token}`, expires_at: expires }, 201);
+      return json(req, { link: patientLink(CHAT_URL, chat_token), expires_at: expires }, 201);
     }
 
     // Revoke immediately — needed the moment a link reaches the wrong person.
@@ -261,11 +295,11 @@ Deno.serve(async (req: Request) => {
       await db.from("requests")
         .update({ chat_token: null, chat_expires_at: null }).eq("id", request.id);
       await audit(request.pharmacy_id, request.id, "staff", "chat_revoked");
-      return json({ ok: true });
+      return json(req, { ok: true });
     }
 
     const body = cleanBody(payload.body);
-    if (!body) return json({ error: "Please write a message." }, 400);
+    if (!body) return json(req, { error: "Please write a message." }, 400);
 
     const { data: row, error } = await db.from("messages").insert({
       request_id: request.id,
@@ -274,13 +308,13 @@ Deno.serve(async (req: Request) => {
       author: String(payload.author ?? "staff").slice(0, 80),
       body: await seal(KEYS, body),
     }).select("id, created_at").single();
-    if (error) { console.error(error); return json({ error: "Could not send that message." }, 500); }
+    if (error) { console.error(error); return json(req, { error: "Could not send that message." }, 500); }
 
     await audit(request.pharmacy_id, request.id, "staff", "message_sent");
-    return json({ ok: true, id: row.id, created_at: row.created_at }, 201);
+    return json(req, { ok: true, id: row.id, created_at: row.created_at }, 201);
   }
 
-  return json({ error: "Method not allowed" }, 405);
+  return json(req, { error: "Method not allowed" }, 405);
 });
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -290,13 +324,11 @@ Deno.serve(async (req: Request) => {
       log records "staff" and PHIPA s.10(1) asks *which* staff. This is the
       open item that blocks the pilot, not a nice-to-have. Risk 1 in
       docs/PIA.md.
-   2. No rate limit on either side. The patient route is unauthenticated by
-      design — the token is the credential — so a leaked token can be
-      hammered, and the staff route can be brute-forced. Both want a limit
-      per token, per key and per IP.
-   3. The staff key belongs in a password manager, not in a browser tab. It
-      is typed into the queue page and lives in localStorage; anyone with the
-      device has it.
+   2. Rate limits are in-memory per isolate — they slow a script down, they
+      do not stop a distributed guess. Tighten with an edge-wide store before
+      a leaked token is a realistic threat.
+   3. The staff key is typed into the queue page and lives in that tab's
+      memory. Anyone with the unlocked device has it. Not localStorage.
    4. Key rotation is supported but unscheduled. Add a key to the front of
       MESSAGE_KEYS, leave the old one behind it, and old messages keep
       opening. Nothing rewrites history, so the old key can never be dropped

@@ -115,7 +115,10 @@ create policy pharmacy_scope_audit on audit_log
 -- Run daily. Adjust the interval to whatever the retention policy says.
 -- ---------------------------------------------------------------
 create or replace function purge_old_payloads(retain interval default '2 years')
-returns integer language plpgsql as $$
+returns integer
+language plpgsql
+set search_path = pg_catalog, public
+as $$
 declare n integer;
 begin
   update requests
@@ -133,7 +136,10 @@ end $$;
 -- ---------------------------------------------------------------
 -- updated_at
 -- ---------------------------------------------------------------
-create or replace function touch_updated_at() returns trigger language plpgsql as $$
+create or replace function touch_updated_at() returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
 begin new.updated_at = now(); return new; end $$;
 
 create trigger requests_touch before update on requests

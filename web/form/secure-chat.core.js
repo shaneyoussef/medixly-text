@@ -2,7 +2,7 @@
    SecureChat — view layer only. All I/O goes through `transport`.
    ════════════════════════════════════════════════════════════════════ */
 
-const ICONS = 'https://unpkg.com/lucide-static@0.454.0/icons/';
+const ICONS = 'icons/';
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -211,6 +211,7 @@ class SecureChat {
     this.opts = opts;
     this.messages = [];
     this.pending = [];          // staged attachments
+    this.threadOnlyMode = false;
     this.typing = false;
     this.stick = true;          // pinned to the newest message
     this.seen = new Set();      // ids already animated in
@@ -254,7 +255,7 @@ class SecureChat {
     send.addEventListener('click', () => this.send());
 
     // Attach sheet
-    this.$('attach').addEventListener('click', () => this.openSheet());
+    this.$('attach').addEventListener('click', () => { if (!this.threadOnlyMode) this.openSheet(); });
     this.$('sheet-cancel').addEventListener('click', () => this.closeSheet());
     this.$('scrim').addEventListener('click', e => { if (e.target === this.$('scrim')) this.closeSheet(); });
     this.$('sheet').addEventListener('keydown', e => {
@@ -270,7 +271,7 @@ class SecureChat {
     });
     ['camera', 'photos', 'docs'].forEach(which => {
       this.$(which).addEventListener('change', e => {
-        this.stage([...e.target.files]);
+        if (!this.threadOnlyMode) this.stage([...e.target.files]);
         e.target.value = '';                    // re-selecting the same file still fires
       });
     });
@@ -279,15 +280,17 @@ class SecureChat {
     this.root.addEventListener('dragover', e => { e.preventDefault(); });
     this.root.addEventListener('drop', e => {
       e.preventDefault();
+      if (this.threadOnlyMode) return;
       if (e.dataTransfer?.files?.length) this.stage([...e.dataTransfer.files]);
     });
     input.addEventListener('paste', e => {
+      if (this.threadOnlyMode) return;
       const files = [...(e.clipboardData?.files || [])];
       if (files.length) { e.preventDefault(); this.stage(files); }
     });
 
     // Voice notes
-    this.$('mic').addEventListener('click', () => this.startRecording());
+    this.$('mic').addEventListener('click', () => { if (!this.threadOnlyMode) this.startRecording(); });
     this.$('rec-stop').addEventListener('click', () => this.stopRecording());
     this.$('rec-cancel').addEventListener('click', () => this.stopRecording({ discard: true }));
     if (!canRecord) this.$('mic').hidden = true;
@@ -315,6 +318,25 @@ class SecureChat {
     this.renderServices();
     this.syncSend();
     o.transport?.subscribe?.(m => this.receive(m));
+  }
+
+  /**
+   * A live `#t=` thread is text only. Attachments, voice notes, the service
+   * rail and the shop do not go through /functions/v1/chat, and leaving them
+   * clickable makes a send look like it landed when it did not.
+   */
+  threadOnly() {
+    this.threadOnlyMode = true;
+    this.opts.services = false;
+    this.opts.shop = null;
+    this.root.classList.add('is-thread-only');
+    const attach = this.$('attach');
+    if (attach) attach.hidden = true;
+    const quick = this.$('quick');
+    if (quick) quick.hidden = true;
+    const mic = this.$('mic');
+    if (mic) mic.hidden = true;
+    this.syncSend();
   }
 
   /* ── Public API ──────────────────────────────────────────────── */
@@ -384,6 +406,7 @@ class SecureChat {
   /* ── Sheet and viewer ────────────────────────────────────────── */
 
   openSheet() {
+    if (this.threadOnlyMode) return;
     this.lastFocus = document.activeElement;
     this.$('scrim').hidden = false;
     this.$('attach').setAttribute('aria-expanded', 'true');
@@ -423,6 +446,7 @@ class SecureChat {
   clearError() { this.$('error').hidden = true; }
 
   async stage(files) {
+    if (this.threadOnlyMode) return;
     this.clearError();
     for (const file of files) {
       if (this.pending.length >= MAX_FILES) {
@@ -462,6 +486,13 @@ class SecureChat {
   }
 
   syncSend() {
+    if (this.threadOnlyMode) {
+      const hasContent = !!this.$('input').value.trim();
+      this.$('mic').hidden = true;
+      this.$('send').hidden = false;
+      this.$('send').disabled = !hasContent;
+      return;
+    }
     const hasContent = !!this.$('input').value.trim() || this.pending.length > 0;
     const showMic = canRecord && !hasContent;
     this.$('mic').hidden = !showMic;
@@ -472,7 +503,7 @@ class SecureChat {
   /* ── Recording ───────────────────────────────────────────────── */
 
   async startRecording() {
-    if (this.recorder) return;
+    if (this.threadOnlyMode || this.recorder) return;
     this.clearError();
     let stream;
     try {

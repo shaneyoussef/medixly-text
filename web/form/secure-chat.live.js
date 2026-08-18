@@ -5,14 +5,16 @@
    nothing. This talks to /functions/v1/chat, which is the same thread the
    pharmacist is looking at in the queue dashboard.
 
-   It takes over only when the URL carries `?t=<token>`, which is the link a
-   pharmacist sends. That token *is* the credential — there is no account and
-   no password behind it — which is why the server scopes it to one request
-   and expires it, and why this file never writes it anywhere. It stays in the
-   address bar and nowhere else: no localStorage, no cookie, nothing left on a
-   shared phone after the tab closes.
+   It takes over only when the URL carries `#t=<token>` (or a legacy `?t=`),
+   which is the link a pharmacist sends. That token *is* the credential — there
+   is no account and no password behind it — which is why the server scopes it
+   to one request and expires it, and why this file never writes it anywhere.
+   It stays in the address bar and nowhere else: no localStorage, no cookie,
+   nothing left on a shared phone after the tab closes.
 
-   When there is no token, this file does nothing and the demo runs.
+   The token lives in the hash (`#t=`), not the query string, so it is not
+   sent to Netlify or to anyone as a Referer. `?t=` links still work and are
+   rewritten to the hash on load.
    ═══════════════════════════════════════════════════════════════════ */
 
 const CHAT_API = 'https://vejzchchrliqrlzlepkc.supabase.co/functions/v1/chat';
@@ -20,8 +22,23 @@ const CHAT_API = 'https://vejzchchrliqrlzlepkc.supabase.co/functions/v1/chat';
 /** Polling, not realtime — see the note in web/queue/index.html. */
 const POLL_MS = 8000;
 
+function readLiveToken() {
+  const fromHash = new URLSearchParams(location.hash.replace(/^#/, '')).get('t');
+  const fromQuery = new URLSearchParams(location.search).get('t');
+  const token = fromHash || fromQuery;
+  // Pull a legacy query token out of the address bar so later navigations,
+  // screenshots of the URL, and Referer headers do not keep carrying it.
+  if (token && fromQuery && !fromHash) {
+    const url = new URL(location.href);
+    url.searchParams.delete('t');
+    url.hash = 't=' + encodeURIComponent(token);
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }
+  return token;
+}
+
 /** Read once. Not stored, not copied, not logged. */
-const LIVE_TOKEN = new URLSearchParams(location.search).get('t');
+const LIVE_TOKEN = readLiveToken();
 
 class MedixlyLive {
   /**

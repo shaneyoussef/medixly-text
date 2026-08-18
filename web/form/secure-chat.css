@@ -13,6 +13,12 @@ button,textarea{font-family:inherit}
   -webkit-mask:var(--icon) center/contain no-repeat;mask:var(--icon) center/contain no-repeat}
 .mx-icon--sm{width:var(--space-4);height:var(--space-4)}
 
+/* Live pharmacist thread: text only. The encrypted function has no upload. */
+.is-thread-only [data-attach],
+.is-thread-only [data-quick],
+.is-thread-only [data-mic],
+.is-thread-only [data-scrim]{display:none !important}
+
 .mx-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* ── Shell ─────────────────────────────────────────────────────────── */

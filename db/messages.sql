@@ -75,7 +75,10 @@ exception when duplicate_object then null; end $$;
 -- and when — deleting that would defeat the log.
 -- ---------------------------------------------------------------
 create or replace function purge_old_messages(retain interval default '2 years')
-returns integer language plpgsql as $$
+returns integer
+language plpgsql
+set search_path = pg_catalog, public
+as $$
 declare n integer;
 begin
   update messages m
